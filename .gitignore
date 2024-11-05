@@ -1,0 +1,48 @@
+# Dependencies
+/frontend/node_modules
+/backend/vendor
+/backend/composer.lock
+package-lock.json
+yarn.lock
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Build files
+/frontend/build
+/frontend/dist
+/public/hot
+/public/storage
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Testing
+/coverage
+/phpunit.xml
+.phpunit.result.cache
+
+# Temporary files
+*.swp
+*.swo
+*.tmp
+*.temp
+
+# Database
+*.sqlite
+*.sqlite3
