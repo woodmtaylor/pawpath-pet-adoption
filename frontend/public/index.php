@@ -27,3 +27,4 @@ $app->get('/api/pets/{id}', [PetController::class, 'getPet']);
 $app->post('/api/pets', [PetController::class, 'createPet']);
 
 $app->run();
+
