@@ -7,6 +7,7 @@ use PawPath\api\AuthController;
 use PawPath\api\ShelterController;
 use PawPath\api\PetController;
 use PawPath\middleware\AuthMiddleware;
+use PawPath\api\AdoptionController;
 
 require __DIR__ . '/../vendor/autoload.php';
 
@@ -99,6 +100,37 @@ $app->group('/api', function ($group) {
         return $controller->listTraits($request, $response);
     });
     
+    // Adoption Application routes
+    $group->post('/adoptions', function ($request, $response) {
+        $controller = new AdoptionController();
+        return $controller->submitApplication($request, $response);
+    });
+    
+    $group->get('/adoptions/user', function ($request, $response) {
+        $controller = new AdoptionController();
+        return $controller->getUserApplications($request, $response);
+    });
+    
+    $group->get('/adoptions/shelter/{shelter_id}', function ($request, $response, $args) {
+        $controller = new AdoptionController();
+        return $controller->getShelterApplications($request, $response, $args);
+    });
+    
+    $group->get('/adoptions/pet/{pet_id}', function ($request, $response, $args) {
+        $controller = new AdoptionController();
+        return $controller->getPetApplications($request, $response, $args);
+    });
+    
+    $group->get('/adoptions/{id}', function ($request, $response, $args) {
+        $controller = new AdoptionController();
+        return $controller->getApplication($request, $response, $args);
+    });
+    
+    $group->put('/adoptions/{id}/status', function ($request, $response, $args) {
+        $controller = new AdoptionController();
+        return $controller->updateApplicationStatus($request, $response, $args);
+    });
+
 })->add(new AuthMiddleware());
 
 $app->run();
