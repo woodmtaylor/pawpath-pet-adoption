@@ -5,6 +5,7 @@ use Slim\Factory\AppFactory;
 use DI\Container;
 use PawPath\api\AuthController;
 use PawPath\api\ShelterController;
+use PawPath\api\PetController;
 use PawPath\middleware\AuthMiddleware;
 
 require __DIR__ . '/../vendor/autoload.php';
@@ -61,15 +62,43 @@ $app->group('/api', function ($group) {
         return $controller->deleteShelter($request, $response, $args);
     });
     
-    // Profile route (keep existing route)
-    $group->get('/profile', function ($request, $response) {
-        $userId = $request->getAttribute('user_id');
-        $response->getBody()->write(json_encode([
-            'message' => 'You are authenticated!',
-            'user_id' => $userId
-        ]));
-        return $response->withHeader('Content-Type', 'application/json');
+    // Pet routes
+    $group->post('/pets', function ($request, $response) {
+        $controller = new PetController();
+        return $controller->createPet($request, $response);
     });
+    
+    $group->get('/pets', function ($request, $response) {
+        $controller = new PetController();
+        return $controller->listPets($request, $response);
+    });
+    
+    $group->get('/pets/{id}', function ($request, $response, $args) {
+        $controller = new PetController();
+        return $controller->getPet($request, $response, $args);
+    });
+    
+    $group->put('/pets/{id}', function ($request, $response, $args) {
+        $controller = new PetController();
+        return $controller->updatePet($request, $response, $args);
+    });
+    
+    $group->delete('/pets/{id}', function ($request, $response, $args) {
+        $controller = new PetController();
+        return $controller->deletePet($request, $response, $args);
+    });
+    
+    // Pet trait routes
+    $group->post('/pet-traits', function ($request, $response) {
+        $controller = new PetController();
+        return $controller->createTrait($request, $response);
+    });
+    
+    $group->get('/pet-traits', function ($request, $response) {
+        $controller = new PetController();
+        return $controller->listTraits($request, $response);
+    });
+    
 })->add(new AuthMiddleware());
 
 $app->run();
