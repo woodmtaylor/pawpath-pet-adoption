@@ -1,12 +1,12 @@
 <?php
 // backend/src/middleware/AuthMiddleware.php
 
-namespace PawPath\Middleware;
+namespace PawPath\middleware;
 
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Psr\Http\Server\RequestHandlerInterface as RequestHandler;
 use Slim\Psr7\Response;
-use PawPath\Services\AuthService;
+use PawPath\services\AuthService;  // Changed from PawPath\Services\AuthService
 
 class AuthMiddleware
 {
@@ -60,4 +60,3 @@ class AuthMiddleware
         return null;
     }
 }
-
