@@ -1,0 +1,18 @@
+{
+    "name": "pawpath/pet-adoption",
+    "description": "PawPath - Pet Adoption Database and Community Platform",
+    "type": "project",
+    "require": {
+        "php": "^8.1",
+        "slim/slim": "^4.11",
+        "slim/psr7": "^1.6",
+        "php-di/php-di": "^7.0",
+        "vlucas/phpdotenv": "^5.5",
+        "firebase/php-jwt": "^6.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "PawPath\\": "src/"
+        }
+    }
+}

@@ -1,76 +1,64 @@
 <?php
-// src/services/AuthService.php
+// backend/src/services/AuthService.php
 
-namespace PawPath\Services;
+namespace PawPath\services;
 
 use Firebase\JWT\JWT;
-use PawPath\Models\User;
+use PawPath\models\User;
 use RuntimeException;
 
 class AuthService {
     private User $userModel;
-    private string $jwtSecret;
     
     public function __construct() {
+        file_put_contents('php://stderr', "Initializing AuthService\n");
         $this->userModel = new User();
-        $this->jwtSecret = $_ENV['JWT_SECRET'] ?? throw new RuntimeException('JWT_SECRET not set');
     }
     
     public function register(array $data): array {
+        file_put_contents('php://stderr', "Starting registration process in AuthService\n");
+        
         // Validate input
         if (empty($data['username']) || empty($data['email']) || empty($data['password'])) {
+            file_put_contents('php://stderr', "Missing required fields\n");
             throw new RuntimeException('Missing required fields');
         }
         
-        // Check if email already exists
-        if ($this->userModel->findByEmail($data['email'])) {
-            throw new RuntimeException('Email already registered');
+        try {
+            file_put_contents('php://stderr', "Creating user in database\n");
+            
+            // Create user
+            $userId = $this->userModel->create($data);
+            
+            file_put_contents('php://stderr', "User created with ID: " . $userId . "\n");
+            
+            // Get user data
+            $user = $this->userModel->findById($userId);
+            
+            file_put_contents('php://stderr', "Retrieved user data: " . print_r($user, true) . "\n");
+            
+            // Generate token
+            $token = $this->generateToken($userId);
+            
+            return [
+                'user' => $user,
+                'token' => $token
+            ];
+        } catch (\Exception $e) {
+            file_put_contents('php://stderr', "Error in registration: " . $e->getMessage() . "\n");
+            throw $e;
         }
-        
-        // Create user
-        $userId = $this->userModel->create($data);
-        
-        // Generate token
-        return [
-            'user' => $this->userModel->findById($userId),
-            'token' => $this->generateToken($userId)
-        ];
-    }
-    
-    public function login(string $email, string $password): array {
-        // Find user
-        $user = $this->userModel->findByEmail($email);
-        
-        if (!$user || !password_verify($password, $user['password_hash'])) {
-            throw new RuntimeException('Invalid credentials');
-        }
-        
-        // Remove password hash from response
-        unset($user['password_hash']);
-        
-        // Generate token
-        return [
-            'user' => $user,
-            'token' => $this->generateToken($user['user_id'])
-        ];
     }
     
     private function generateToken(int $userId): string {
+        $jwtSecret = $_ENV['JWT_SECRET'] ?? throw new RuntimeException('JWT_SECRET not set');
+        
         $payload = [
             'user_id' => $userId,
             'iat' => time(),
             'exp' => time() + (24 * 60 * 60) // 24 hours
         ];
         
-        return JWT::encode($payload, $this->jwtSecret, 'HS256');
-    }
-    
-    public function validateToken(string $token): ?array {
-        try {
-            $decoded = JWT::decode($token, $this->jwtSecret, ['HS256']);
-            return (array) $decoded;
-        } catch (\Exception $e) {
-            return null;
-        }
+        return JWT::encode($payload, $jwtSecret, 'HS256');
     }
 }
