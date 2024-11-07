@@ -1,6 +1,4 @@
 <?php
-// backend/src/models/Pet.php
-
 namespace PawPath\models;
 
 use PDO;
@@ -9,14 +7,116 @@ use PawPath\config\database\DatabaseConfig;
 
 class Pet {
     private PDO $db;
+    private static array $validSpecies = ['dog', 'cat', 'bird', 'rabbit', 'other'];
     
     public function __construct() {
         $this->db = DatabaseConfig::getConnection();
     }
     
+    public function findAll(array $filters = []): array {
+        try {
+            $query = "
+                SELECT p.*, s.name as shelter_name 
+                FROM Pet p
+                LEFT JOIN Shelter s ON p.shelter_id = s.shelter_id
+                WHERE 1=1
+            ";
+            $params = [];
+            
+            if (isset($filters['species'])) {
+                $query .= " AND p.species = ?";
+                $params[] = $filters['species'];
+            }
+            
+            if (isset($filters['shelter_id'])) {
+                $query .= " AND p.shelter_id = ?";
+                $params[] = $filters['shelter_id'];
+            }
+
+            if (isset($filters['breed'])) {
+                $query .= " AND p.breed LIKE ?";
+                $params[] = '%' . $filters['breed'] . '%';
+            }
+
+            if (isset($filters['age_min'])) {
+                $query .= " AND p.age >= ?";
+                $params[] = $filters['age_min'];
+            }
+
+            if (isset($filters['age_max'])) {
+                $query .= " AND p.age <= ?";
+                $params[] = $filters['age_max'];
+            }
+
+            if (isset($filters['gender'])) {
+                $query .= " AND p.gender = ?";
+                $params[] = $filters['gender'];
+            }
+            
+            $stmt = $this->db->prepare($query);
+            $stmt->execute($params);
+            $pets = $stmt->fetchAll();
+
+            // Get traits for each pet
+            foreach ($pets as &$pet) {
+                $stmt = $this->db->prepare("
+                    SELECT t.trait_id, t.trait_name, tc.name as category_name
+                    FROM Pet_Trait_Relation ptr
+                    JOIN Pet_Trait t ON ptr.trait_id = t.trait_id
+                    LEFT JOIN Trait_Category tc ON t.category_id = tc.category_id
+                    WHERE ptr.pet_id = ?
+                ");
+                $stmt->execute([$pet['pet_id']]);
+                $pet['traits'] = $stmt->fetchAll();
+            }
+            
+            return $pets;
+        } catch (PDOException $e) {
+            error_log("Error finding pets: " . $e->getMessage());
+            throw $e;
+        }
+    }
+    
+    public function findById(int $id): ?array {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT p.*, s.name as shelter_name
+                FROM Pet p
+                LEFT JOIN Shelter s ON p.shelter_id = s.shelter_id
+                WHERE p.pet_id = ?
+            ");
+            $stmt->execute([$id]);
+            $pet = $stmt->fetch();
+            
+            if (!$pet) {
+                return null;
+            }
+            
+            // Get pet traits with categories
+            $stmt = $this->db->prepare("
+                SELECT t.trait_id, t.trait_name, t.value_type, t.possible_values,
+                       tc.name as category_name, tc.description as category_description
+                FROM Pet_Trait_Relation ptr
+                JOIN Pet_Trait t ON ptr.trait_id = t.trait_id
+                LEFT JOIN Trait_Category tc ON t.category_id = tc.category_id
+                WHERE ptr.pet_id = ?
+            ");
+            $stmt->execute([$id]);
+            $pet['traits'] = $stmt->fetchAll();
+            
+            return $pet;
+        } catch (PDOException $e) {
+            error_log("Error finding pet by ID: " . $e->getMessage());
+            throw $e;
+        }
+    }
+    
     public function create(array $data): int {
         try {
             $this->db->beginTransaction();
+            
+            // Validate required fields
+            $this->validatePetData($data);
             
             error_log("Creating new pet: " . $data['name']);
             
@@ -39,130 +139,15 @@ class Pet {
             
             // Add traits if provided
             if (!empty($data['traits']) && is_array($data['traits'])) {
-                foreach ($data['traits'] as $traitId) {
-                    $stmt = $this->db->prepare("
-                        INSERT INTO Pet_Trait_Relation (pet_id, trait_id)
-                        VALUES (?, ?)
-                    ");
-                    $stmt->execute([$petId, $traitId]);
-                }
+                error_log("Adding traits for pet $petId: " . implode(', ', $data['traits']));
+                $this->addTraitsToPet($petId, $data['traits']);
             }
             
             $this->db->commit();
-            error_log("Created pet with ID: " . $petId);
-            
             return $petId;
         } catch (PDOException $e) {
             $this->db->rollBack();
             error_log("Error creating pet: " . $e->getMessage());
-            throw $e;
-        }
-    }
-    
-    public function findById(int $id): ?array {
-        try {
-            // Get pet basic information
-            $stmt = $this->db->prepare("
-                SELECT p.*, s.name as shelter_name
-                FROM Pet p
-                LEFT JOIN Shelter s ON p.shelter_id = s.shelter_id
-                WHERE p.pet_id = ?
-            ");
-            
-            $stmt->execute([$id]);
-            $pet = $stmt->fetch();
-            
-            if (!$pet) {
-                return null;
-            }
-            
-            // Get pet traits
-            $stmt = $this->db->prepare("
-                SELECT t.trait_id, t.trait_name
-                FROM Pet_Trait_Relation ptr
-                JOIN Pet_Trait t ON ptr.trait_id = t.trait_id
-                WHERE ptr.pet_id = ?
-            ");
-            
-            $stmt->execute([$id]);
-            $pet['traits'] = $stmt->fetchAll();
-            
-            return $pet;
-        } catch (PDOException $e) {
-            error_log("Error finding pet: " . $e->getMessage());
-            throw $e;
-        }
-    }
-    
-    public function findAll(array $filters = []): array {
-        try {
-            $query = "
-                SELECT DISTINCT p.*, s.name as shelter_name
-                FROM Pet p
-                LEFT JOIN Shelter s ON p.shelter_id = s.shelter_id
-                LEFT JOIN Pet_Trait_Relation ptr ON p.pet_id = ptr.pet_id
-                LEFT JOIN Pet_Trait t ON ptr.trait_id = t.trait_id
-                WHERE 1=1
-            ";
-            
-            $params = [];
-            
-            // Add filters
-            if (!empty($filters['species'])) {
-                $query .= " AND p.species = ?";
-                $params[] = $filters['species'];
-            }
-            
-            if (!empty($filters['breed'])) {
-                $query .= " AND p.breed LIKE ?";
-                $params[] = '%' . $filters['breed'] . '%';
-            }
-            
-            if (isset($filters['shelter_id'])) {
-                $query .= " AND p.shelter_id = ?";
-                $params[] = $filters['shelter_id'];
-            }
-            
-            if (!empty($filters['traits']) && is_array($filters['traits'])) {
-                $placeholders = str_repeat('?,', count($filters['traits']) - 1) . '?';
-                $query .= " AND t.trait_id IN ($placeholders)";
-                $params = array_merge($params, $filters['traits']);
-            }
-            
-            if (isset($filters['age_min'])) {
-                $query .= " AND p.age >= ?";
-                $params[] = $filters['age_min'];
-            }
-            
-            if (isset($filters['age_max'])) {
-                $query .= " AND p.age <= ?";
-                $params[] = $filters['age_max'];
-            }
-            
-            if (!empty($filters['gender'])) {
-                $query .= " AND p.gender = ?";
-                $params[] = $filters['gender'];
-            }
-            
-            $stmt = $this->db->prepare($query);
-            $stmt->execute($params);
-            $pets = $stmt->fetchAll();
-            
-            // Get traits for each pet
-            foreach ($pets as &$pet) {
-                $stmt = $this->db->prepare("
-                    SELECT t.trait_id, t.trait_name
-                    FROM Pet_Trait_Relation ptr
-                    JOIN Pet_Trait t ON ptr.trait_id = t.trait_id
-                    WHERE ptr.pet_id = ?
-                ");
-                $stmt->execute([$pet['pet_id']]);
-                $pet['traits'] = $stmt->fetchAll();
-            }
-            
-            return $pets;
-        } catch (PDOException $e) {
-            error_log("Error finding pets: " . $e->getMessage());
             throw $e;
         }
     }
@@ -174,11 +159,10 @@ class Pet {
             $fields = [];
             $params = [];
             
-            // Build update fields dynamically
-            foreach (['name', 'species', 'breed', 'age', 'gender', 'description', 'shelter_id'] as $field) {
-                if (isset($data[$field])) {
-                    $fields[] = "$field = ?";
-                    $params[] = $data[$field];
+            foreach ($data as $key => $value) {
+                if (in_array($key, ['name', 'species', 'breed', 'age', 'gender', 'description', 'shelter_id'])) {
+                    $fields[] = "$key = ?";
+                    $params[] = $value;
                 }
             }
             
@@ -197,13 +181,7 @@ class Pet {
                 $stmt->execute([$id]);
                 
                 // Add new traits
-                foreach ($data['traits'] as $traitId) {
-                    $stmt = $this->db->prepare("
-                        INSERT INTO Pet_Trait_Relation (pet_id, trait_id)
-                        VALUES (?, ?)
-                    ");
-                    $stmt->execute([$id, $traitId]);
-                }
+                $this->addTraitsToPet($id, $data['traits']);
             }
             
             $this->db->commit();
@@ -234,5 +212,176 @@ class Pet {
             error_log("Error deleting pet: " . $e->getMessage());
             throw $e;
         }
+    }
+
+    public function findAllWithTraits(array $filters = []): array {
+        try {
+            error_log("Finding pets with filters: " . json_encode($filters, JSON_PRETTY_PRINT));
+            
+            // First, let's verify what traits exist in the database
+            $stmt = $this->db->query("
+                SELECT t.trait_id, t.trait_name, tc.name as category 
+                FROM Pet_Trait t 
+                LEFT JOIN Trait_Category tc ON t.category_id = tc.category_id
+            ");
+            error_log("Available traits: " . json_encode($stmt->fetchAll(), JSON_PRETTY_PRINT));
+            
+            // Then verify what pets and their traits exist
+            $stmt = $this->db->query("
+                SELECT p.pet_id, p.name, t.trait_name 
+                FROM Pet p 
+                LEFT JOIN Pet_Trait_Relation ptr ON p.pet_id = ptr.pet_id 
+                LEFT JOIN Pet_Trait t ON ptr.trait_id = t.trait_id
+            ");
+            error_log("Existing pets and traits: " . json_encode($stmt->fetchAll(), JSON_PRETTY_PRINT));
+            
+            $query = "
+                SELECT 
+                    p.*,
+                    s.name as shelter_name,
+                    GROUP_CONCAT(DISTINCT t.trait_name) as trait_names,
+                    COUNT(DISTINCT CASE 
+                        WHEN t.trait_name IN (" . $this->buildTraitNameList($filters) . ") 
+                        THEN t.trait_id 
+                    END) as matching_trait_count
+                FROM Pet p
+                LEFT JOIN Shelter s ON p.shelter_id = s.shelter_id
+                LEFT JOIN Pet_Trait_Relation ptr ON p.pet_id = ptr.pet_id
+                LEFT JOIN Pet_Trait t ON ptr.trait_id = t.trait_id
+                WHERE 1=1
+            ";
+            
+            $params = [];
+            
+            if (!empty($filters['species'])) {
+                $query .= " AND p.species = ?";
+                $params[] = $filters['species'];
+            }
+            
+            $query .= " GROUP BY p.pet_id";
+            
+            if (!empty($filters['traits'])) {
+                $query .= " HAVING matching_trait_count > 0";
+            }
+            
+            $query .= " ORDER BY matching_trait_count DESC, p.name";
+            
+            error_log("Executing query: " . $query);
+            error_log("With params: " . json_encode($params));
+            
+            $stmt = $this->db->prepare($query);
+            $stmt->execute($params);
+            $pets = $stmt->fetchAll();
+            
+            error_log("Found pets: " . json_encode($pets, JSON_PRETTY_PRINT));
+            
+            foreach ($pets as &$pet) {
+                $stmt = $this->db->prepare("
+                    SELECT t.trait_name, tc.name as category
+                    FROM Pet_Trait_Relation ptr
+                    JOIN Pet_Trait t ON ptr.trait_id = t.trait_id
+                    LEFT JOIN Trait_Category tc ON t.category_id = tc.category_id
+                    WHERE ptr.pet_id = ?
+                ");
+                $stmt->execute([$pet['pet_id']]);
+                $traits = $stmt->fetchAll();
+                
+                $pet['traits'] = [];
+                foreach ($traits as $trait) {
+                    $category = $trait['category'] ?? 'Uncategorized';
+                    if (!isset($pet['traits'][$category])) {
+                        $pet['traits'][$category] = [];
+                    }
+                    $pet['traits'][$category][] = $trait['trait_name'];
+                }
+            }
+            
+            return $pets;
+        } catch (PDOException $e) {
+            error_log("Error finding pets with traits: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    private function validatePetData(array $data): void {
+        $requiredFields = ['name', 'species', 'shelter_id'];
+        foreach ($requiredFields as $field) {
+            if (empty($data[$field])) {
+                throw new \InvalidArgumentException("Missing required field: $field");
+            }
+        }
+        
+        if (!in_array($data['species'], self::$validSpecies)) {
+            throw new \InvalidArgumentException("Invalid species: " . $data['species']);
+        }
+    }
+
+    private function addTraitsToPet(int $petId, array $traitIds): void {
+        // First verify all traits exist
+        $placeholders = str_repeat('?,', count($traitIds) - 1) . '?';
+        $stmt = $this->db->prepare("
+            SELECT trait_id FROM Pet_Trait 
+            WHERE trait_id IN ($placeholders)
+        ");
+        $stmt->execute($traitIds);
+        $validTraits = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        
+        error_log("Valid traits found for pet $petId: " . implode(', ', $validTraits));
+        
+        if (count($validTraits) !== count($traitIds)) {
+            throw new \InvalidArgumentException("Some trait IDs are invalid");
+        }
+        
+        // Insert valid traits
+        $stmt = $this->db->prepare("
+            INSERT INTO Pet_Trait_Relation (pet_id, trait_id)
+            VALUES (?, ?)
+        ");
+        
+        foreach ($validTraits as $traitId) {
+            $stmt->execute([$petId, $traitId]);
+            error_log("Added trait $traitId to pet $petId");
+        }
+    }
+
+    private function buildTraitNameList(array $filters): string {
+        if (empty($filters['traits'])) {
+            return "''";
+        }
+        
+        $traitNames = array_map(function($trait) {
+            return $this->db->quote($trait['trait']);
+        }, $filters['traits']);
+        
+        // Add debugging
+        error_log("Building trait list from: " . json_encode($filters['traits']));
+        error_log("Generated trait list: " . implode(',', $traitNames));
+        
+        return implode(',', $traitNames);
+    }
+
+    private function processTraits(?string $traitsJson): array {
+        if (empty($traitsJson)) {
+            return [];
+        }
+        
+        $formatted = [];
+        $traits = array_filter(explode('},{', trim($traitsJson, '[]')));
+        
+        foreach ($traits as $trait) {
+            if (!str_ends_with($trait, '}')) $trait .= '}';
+            if (!str_starts_with($trait, '{')) $trait = '{' . $trait;
+            
+            $traitData = json_decode($trait, true);
+            if ($traitData) {
+                $category = $traitData['category'];
+                if (!isset($formatted[$category])) {
+                    $formatted[$category] = [];
+                }
+                $formatted[$category][] = $traitData['name'];
+            }
+        }
+        
+        return $formatted;
     }
 }

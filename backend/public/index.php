@@ -35,6 +35,12 @@ $app->post('/api/auth/login', function ($request, $response) {
     return $controller->login($request, $response);
 });
 
+// Quiz routes
+$app->get('/api/quiz/start', [QuizController::class, 'startQuiz']);
+$app->post('/api/quiz/submit', [QuizController::class, 'submitQuiz'])->add(new AuthMiddleware());
+$app->get('/api/quiz/history', [QuizController::class, 'getQuizHistory'])->add(new AuthMiddleware());
+$app->get('/api/quiz/{id}', [QuizController::class, 'getQuizResult'])->add(new AuthMiddleware());
+
 // Protected routes
 $app->group('/api', function ($group) {
     // Shelter routes
