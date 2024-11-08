@@ -21,7 +21,7 @@ class Pet {
             throw new \InvalidArgumentException("Invalid species. Must be one of: " . implode(', ', self::$validSpecies));
         }
     }
-
+ 
     public function __construct() {
         $this->db = DatabaseConfig::getConnection();
     }
@@ -128,17 +128,17 @@ class Pet {
         try {
             $this->db->beginTransaction();
             
+            error_log("Starting pet creation with data: " . print_r($data, true));
+            
             // Validate required fields
             $this->validatePetData($data);
-            
-            error_log("Creating new pet: " . $data['name']);
             
             $stmt = $this->db->prepare("
                 INSERT INTO Pet (name, species, breed, age, gender, description, shelter_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             ");
             
-            $stmt->execute([
+            $result = $stmt->execute([
                 $data['name'],
                 $data['species'],
                 $data['breed'] ?? null,
@@ -148,19 +148,24 @@ class Pet {
                 $data['shelter_id']
             ]);
             
+            if (!$result) {
+                error_log("SQL Error: " . print_r($stmt->errorInfo(), true));
+                throw new \PDOException("Failed to insert pet");
+            }
+            
             $petId = (int) $this->db->lastInsertId();
+            error_log("Created pet with ID: $petId");
             
             // Add traits if provided
             if (!empty($data['traits']) && is_array($data['traits'])) {
-                error_log("Adding traits for pet $petId: " . implode(', ', $data['traits']));
                 $this->addTraitsToPet($petId, $data['traits']);
             }
             
             $this->db->commit();
             return $petId;
-        } catch (PDOException $e) {
+        } catch (\Exception $e) {
             $this->db->rollBack();
-            error_log("Error creating pet: " . $e->getMessage());
+            error_log("Error in Pet::create: " . $e->getMessage() . "\n" . $e->getTraceAsString());
             throw $e;
         }
     }
@@ -313,19 +318,6 @@ class Pet {
         } catch (PDOException $e) {
             error_log("Error finding pets with traits: " . $e->getMessage());
             throw $e;
-        }
-    }
-
-    private function validatePetData(array $data): void {
-        $requiredFields = ['name', 'species', 'shelter_id'];
-        foreach ($requiredFields as $field) {
-            if (empty($data[$field])) {
-                throw new \InvalidArgumentException("Missing required field: $field");
-            }
-        }
-        
-        if (!in_array($data['species'], self::$validSpecies)) {
-            throw new \InvalidArgumentException("Invalid species: " . $data['species']);
         }
     }
 

@@ -20,51 +20,31 @@ class PetService {
     }
     
     public function createPet(array $data): array {
-        // Validate required fields
-        $requiredFields = ['name', 'species', 'shelter_id'];
-        foreach ($requiredFields as $field) {
-            if (empty($data[$field])) {
-                throw new RuntimeException("Missing required field: $field");
-            }
-        }
-        
-        // Validate species (could be expanded based on your requirements)
-        $validSpecies = ['Dog', 'Cat', 'Bird', 'Rabbit', 'Other'];
-        if (!in_array($data['species'], $validSpecies)) {
-            throw new RuntimeException("Invalid species. Must be one of: " . implode(', ', $validSpecies));
-        }
-        
-        // Verify shelter exists
-        $shelter = $this->shelterModel->findById($data['shelter_id']);
-        if (!$shelter) {
-            throw new RuntimeException("Invalid shelter ID");
-        }
-        
-        // Validate age if provided
-        if (isset($data['age']) && ($data['age'] < 0 || $data['age'] > 30)) {
-            throw new RuntimeException("Invalid age. Must be between 0 and 30");
-        }
-        
-        // Validate gender if provided
-        if (isset($data['gender'])) {
-            $validGenders = ['Male', 'Female'];
-            if (!in_array($data['gender'], $validGenders)) {
-                throw new RuntimeException("Invalid gender. Must be one of: " . implode(', ', $validGenders));
-            }
-        }
-        
-        // Validate traits if provided
-        if (!empty($data['traits'])) {
-            foreach ($data['traits'] as $traitId) {
-                if (!$this->traitModel->findById($traitId)) {
-                    throw new RuntimeException("Invalid trait ID: $traitId");
+        try {
+            error_log("Creating pet with data: " . json_encode($data));
+            
+            // Validate required fields
+            $requiredFields = ['name', 'species', 'shelter_id'];
+            foreach ($requiredFields as $field) {
+                if (empty($data[$field])) {
+                    throw new RuntimeException("Missing required field: $field");
                 }
             }
+            
+            // Create pet
+            $petId = $this->petModel->create($data);
+            error_log("Created pet with ID: $petId");
+            
+            $pet = $this->petModel->findById($petId);
+            if (!$pet) {
+                throw new RuntimeException("Failed to retrieve created pet");
+            }
+            
+            return $pet;
+        } catch (\Exception $e) {
+            error_log("Error in PetService::createPet: " . $e->getMessage());
+            throw $e;
         }
-        
-        // Create pet
-        $petId = $this->petModel->create($data);
-        return $this->petModel->findById($petId);
     }
     
     public function updatePet(int $id, array $data): array {

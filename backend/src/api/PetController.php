@@ -22,28 +22,41 @@ class PetController {
             if (!is_array($data)) {
                 $body = (string) $request->getBody();
                 $data = json_decode($body, true);
+                error_log('Parsed JSON data: ' . print_r($data, true));
                 
                 if (json_last_error() !== JSON_ERROR_NONE) {
-                    throw new \RuntimeException('Invalid JSON data provided');
+                    throw new \RuntimeException('Invalid JSON data provided: ' . json_last_error_msg());
                 }
             }
             
-            $result = $this->petService->createPet($data);
+            if (empty($data)) {
+                throw new \RuntimeException('No data provided');
+            }
             
-            $response->getBody()->write(json_encode($result));
-            return $response->withHeader('Content-Type', 'application/json')
-                           ->withStatus(201);
-        } catch (\Exception $e) {
-            error_log('Error creating pet: ' . $e->getMessage());
+            $result = $this->petService->createPet($data);
+            error_log('Pet creation result: ' . print_r($result, true));
             
             $response->getBody()->write(json_encode([
-                'error' => $e->getMessage()
+                'success' => true,
+                'data' => $result
             ]));
-            return $response->withHeader('Content-Type', 'application/json')
-                           ->withStatus(400);
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withStatus(201);
+        } catch (\Exception $e) {
+            error_log('Error creating pet: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
+            
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString() // Remove in production
+            ]));
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withStatus(400);
         }
     }
-    
+       
     public function getPet(Request $request, Response $response, array $args): Response {
         try {
             $petId = (int) $args['id'];
