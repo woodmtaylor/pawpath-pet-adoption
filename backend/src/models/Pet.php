@@ -7,8 +7,21 @@ use PawPath\config\database\DatabaseConfig;
 
 class Pet {
     private PDO $db;
-    private static array $validSpecies = ['dog', 'cat', 'bird', 'rabbit', 'other'];
-    
+    private static array $validSpecies = ['Dog', 'Cat', 'Bird', 'Rabbit', 'Other'];
+
+    private function validatePetData(array $data): void {
+        $requiredFields = ['name', 'species', 'shelter_id'];
+        foreach ($requiredFields as $field) {
+            if (empty($data[$field])) {
+                throw new \InvalidArgumentException("Missing required field: $field");
+            }
+        }
+        
+        if (!in_array(ucfirst(strtolower($data['species'])), self::$validSpecies)) {
+            throw new \InvalidArgumentException("Invalid species. Must be one of: " . implode(', ', self::$validSpecies));
+        }
+    }
+
     public function __construct() {
         $this->db = DatabaseConfig::getConnection();
     }

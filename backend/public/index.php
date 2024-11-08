@@ -6,8 +6,9 @@ use DI\Container;
 use PawPath\api\AuthController;
 use PawPath\api\ShelterController;
 use PawPath\api\PetController;
-use PawPath\middleware\AuthMiddleware;
+use PawPath\api\QuizController;
 use PawPath\api\AdoptionController;
+use PawPath\middleware\AuthMiddleware;
 
 require __DIR__ . '/../vendor/autoload.php';
 
@@ -35,14 +36,29 @@ $app->post('/api/auth/login', function ($request, $response) {
     return $controller->login($request, $response);
 });
 
-// Quiz routes
-$app->get('/api/quiz/start', [QuizController::class, 'startQuiz']);
-$app->post('/api/quiz/submit', [QuizController::class, 'submitQuiz'])->add(new AuthMiddleware());
-$app->get('/api/quiz/history', [QuizController::class, 'getQuizHistory'])->add(new AuthMiddleware());
-$app->get('/api/quiz/{id}', [QuizController::class, 'getQuizResult'])->add(new AuthMiddleware());
-
-// Protected routes
+// Protected routes group
 $app->group('/api', function ($group) {
+    // Quiz routes
+    $group->get('/quiz/start', function ($request, $response) {
+        $controller = new QuizController();
+        return $controller->startQuiz($request, $response);
+    });
+    
+    $group->post('/quiz/submit', function ($request, $response) {
+        $controller = new QuizController();
+        return $controller->submitQuiz($request, $response);
+    });
+    
+    $group->get('/quiz/history', function ($request, $response) {
+        $controller = new QuizController();
+        return $controller->getQuizHistory($request, $response);
+    });
+    
+    $group->get('/quiz/{id}', function ($request, $response, $args) {
+        $controller = new QuizController();
+        return $controller->getQuizResult($request, $response, $args);
+    });
+    
     // Shelter routes
     $group->post('/shelters', function ($request, $response) {
         $controller = new ShelterController();
@@ -136,7 +152,7 @@ $app->group('/api', function ($group) {
         $controller = new AdoptionController();
         return $controller->updateApplicationStatus($request, $response, $args);
     });
-
 })->add(new AuthMiddleware());
 
+// Run the app
 $app->run();

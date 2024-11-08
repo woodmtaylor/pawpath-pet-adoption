@@ -41,9 +41,22 @@ try {
     // Create a pet - Use the shelter_id from your actual shelter
     $shelter_id = 3; // Replace with your actual shelter ID from the GET shelters request
     
+    try {
+        $shelterModel = new \PawPath\models\Shelter();
+        $shelter = $shelterModel->findById($shelter_id);
+        if (!$shelter) {
+            throw new \RuntimeException("Shelter with ID $shelter_id not found");
+        }
+    } catch (Exception $e) {
+        echo "Error checking shelter: " . $e->getMessage() . "\n";
+        exit(1);
+    }
+
+    echo "Using shelter: " . $shelter['name'] . "\n";
+
     $petData = [
         'name' => 'Max',
-        'species' => 'Dog',
+        'species' => 'dog',
         'breed' => 'Golden Retriever',
         'age' => 3,
         'gender' => 'Male',
@@ -74,7 +87,7 @@ try {
     print_r($updatedPet);
     
     // Test search functionality
-    $searchResults = $petModel->findAll(['species' => 'Dog']);
+    $searchResults = $petModel->findAll(['species' => 'dog']);
     echo "\nSearch results for dogs:\n";
     print_r($searchResults);
     
