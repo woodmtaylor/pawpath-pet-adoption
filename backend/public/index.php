@@ -12,6 +12,8 @@ use PawPath\api\PetController;
 use PawPath\api\QuizController;
 use PawPath\api\AdoptionController;
 use PawPath\middleware\AuthMiddleware;
+use PawPath\api\BlogController;
+use PawPath\api\ProductController;
 
 require __DIR__ . '/../vendor/autoload.php';
 
@@ -155,6 +157,59 @@ $app->group('/api', function ($group) {
         $controller = new AdoptionController();
         return $controller->updateApplicationStatus($request, $response, $args);
     });
+
+    // Blog routes
+    $group->post('/blog/posts', function ($request, $response) {
+        $controller = new BlogController();
+        return $controller->createPost($request, $response);
+    });
+
+    $group->get('/blog/posts', function ($request, $response) {
+        $controller = new BlogController();
+        return $controller->listPosts($request, $response);
+    });
+
+    $group->get('/blog/posts/{id}', function ($request, $response, $args) {
+        $controller = new BlogController();
+        return $controller->getPost($request, $response, $args);
+    });
+
+    $group->put('/blog/posts/{id}', function ($request, $response, $args) {
+        $controller = new BlogController();
+        return $controller->updatePost($request, $response, $args);
+    });
+
+    $group->delete('/blog/posts/{id}', function ($request, $response, $args) {
+        $controller = new BlogController();
+        return $controller->deletePost($request, $response, $args);
+    });
+
+    // Product routes
+    $group->post('/products', function ($request, $response) {
+        $controller = new ProductController();
+        return $controller->createProduct($request, $response);
+    });
+
+    $group->get('/products', function ($request, $response) {
+        $controller = new ProductController();
+        return $controller->listProducts($request, $response);
+    });
+
+    $group->get('/products/{id}', function ($request, $response, $args) {
+        $controller = new ProductController();
+        return $controller->getProduct($request, $response, $args);
+    });
+
+    $group->put('/products/{id}', function ($request, $response, $args) {
+        $controller = new ProductController();
+        return $controller->updateProduct($request, $response, $args);
+    });
+
+    $group->delete('/products/{id}', function ($request, $response, $args) {
+        $controller = new ProductController();
+        return $controller->deleteProduct($request, $response, $args);
+    });
+
 })->add(new AuthMiddleware());
 
 // Run the app

@@ -49,6 +49,20 @@ verify_match() {
     fi
 }
 
+check_server() {
+    echo "Checking server status..."
+    local response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/auth/login)
+    
+    if [ "$response" = "000" ]; then
+        echo "Error: Cannot connect to server at http://localhost:8000"
+        echo "Please ensure the PHP server is running with:"
+        echo "php -S localhost:8000 -t public/"
+        exit 1
+    else
+        echo "Server is reachable"
+    fi
+}
+
 make_request() {
     local method=$1
     local endpoint=$2
@@ -65,11 +79,28 @@ make_request() {
         curl_cmd="$curl_cmd -d '${data}'"
     fi
     
-    # Debug output to stderr
-    echo "→ ${method} ${endpoint}" >&2
+    # Debug output
+    # echo "Request command: $curl_cmd '${BASE_URL}${endpoint}'" >&2
     
-    # Execute request
-    eval $curl_cmd "'${BASE_URL}${endpoint}'"
+    # Execute request and capture response with error handling
+    local response=$(eval $curl_cmd "'${BASE_URL}${endpoint}'" 2>&1)
+    local status=$?
+    
+    if [ $status -ne 0 ]; then
+        echo "Curl command failed with status $status" >&2
+        echo "Error: $response" >&2
+        return 1
+    fi
+    
+    # Debug output
+    # echo "Raw response: $response" >&2
+    
+    # Check if response is valid JSON
+    if ! echo "$response" | jq '.' >/dev/null 2>&1; then
+        echo "Warning: Response is not valid JSON: $response" >&2
+    fi
+    
+    echo "$response"
 }
 
 summarize_quiz_response() {
@@ -227,12 +258,6 @@ test_pets() {
             fi
         fi
     fi
-    
-    echo -e "\nTest Summary:"
-    echo "════════════════"
-    echo "Total Verifications: $TOTAL_CHECKS"
-    echo "Passed: $PASSED_CHECKS"
-    echo "Failed: $((TOTAL_CHECKS - PASSED_CHECKS))"
 
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
     [ $PASSED_CHECKS -eq $TOTAL_CHECKS ] && PASSED_TESTS=$((PASSED_TESTS + 1))
@@ -264,18 +289,133 @@ test_quiz() {
     [ $PASSED_CHECKS -eq $TOTAL_CHECKS ] && PASSED_TESTS=$((PASSED_TESTS + 1))
 }
 
+test_blog() {
+    TOTAL_CHECKS=0
+    PASSED_CHECKS=0
+    
+    echo -e "\n${BLUE}Testing Blog Post Endpoints${NC}"
+    echo "════════════════════════════════"
+    
+    echo "Step 1: Creating blog post..."
+    local post_data='{
+        "title": "Test Blog Post_'${TIMESTAMP}'",
+        "content": "This is a test blog post content with a timestamp of '${TIMESTAMP}'",
+        "product_ids": []
+    }'
+    
+    local post_response=$(make_request "POST" "/blog/posts" "$post_data")
+    local POST_ID=$(echo $post_response | jq -r '.post_id')
+    verify_match "true" "$(echo $post_response | jq 'has("post_id")')" "Blog post created"
+    
+    echo -e "\nStep 2: Verifying blog post details..."
+    local get_response=$(make_request "GET" "/blog/posts/$POST_ID")
+    verify_match "Test Blog Post_${TIMESTAMP}" "$(echo $get_response | jq -r '.title')" "Post title"
+    verify_match "true" "$(echo $get_response | jq -r '.content | contains("test blog post content")')" "Post content contains test text"
+    
+    echo -e "\nStep 3: Updating blog post..."
+    local update_data='{
+        "title": "Updated Test Blog Post_'${TIMESTAMP}'",
+        "content": "This is updated content for timestamp '${TIMESTAMP}'"
+    }'
+    
+    local update_response=$(make_request "PUT" "/blog/posts/$POST_ID" "$update_data")
+    verify_match "Updated Test Blog Post_${TIMESTAMP}" "$(echo $update_response | jq -r '.title')" "Updated post title"
+    
+
+    echo "Step 4: Testing blog post search..."
+    # First try exact title match
+    local title_search=$(make_request "GET" "/blog/posts?search=Updated%20Test%20Blog%20Post_${TIMESTAMP}")
+    # debug
+    # echo "Title search response: $title_search" >&2
+
+    # Then try partial match
+    local partial_search=$(make_request "GET" "/blog/posts?search=Updated%20Test")
+    # debug
+    # echo "Partial search response: $partial_search" >&2
+
+    # Use the partial search for verification
+    verify_match "true" "$(echo $partial_search | jq 'length > 0')" "Search results found"
+
+    # If we got results, verify the latest post matches
+    if [ "$(echo $partial_search | jq 'length > 0')" = "true" ]; then
+        # Get the most recent post (highest post_id)
+        local latest_post=$(echo $partial_search | jq 'sort_by(.post_id) | last')
+        verify_match "Updated Test Blog Post_${TIMESTAMP}" "$(echo $latest_post | jq -r '.title')" "Search result title matches"
+    fi
+    
+    TOTAL_TESTS=$((TOTAL_TESTS + 1))
+    [ $PASSED_CHECKS -eq $TOTAL_CHECKS ] && PASSED_TESTS=$((PASSED_TESTS + 1))
+}
+
+test_products() {
+    TOTAL_CHECKS=0
+    PASSED_CHECKS=0
+    
+    echo -e "\n${BLUE}Testing Product Endpoints${NC}"
+    echo "════════════════════════════════"
+    
+    echo "Step 1: Creating product..."
+    local product_data='{
+        "name": "Test Product_'${TIMESTAMP}'",
+        "description": "This is a test product description",
+        "price": 29.99,
+        "affiliate_link": "https://example.com/product_'${TIMESTAMP}'"
+    }'
+    
+    local product_response=$(make_request "POST" "/products" "$product_data")
+    local PRODUCT_ID=$(echo $product_response | jq -r '.product_id')
+    verify_match "true" "$(echo $product_response | jq 'has("product_id")')" "Product created"
+    
+    echo -e "\nStep 2: Verifying product details..."
+    local get_response=$(make_request "GET" "/products/$PRODUCT_ID")
+    verify_match "Test Product_${TIMESTAMP}" "$(echo $get_response | jq -r '.name')" "Product name"
+    verify_match "29.99" "$(echo $get_response | jq -r '.price')" "Product price"
+    
+    echo -e "\nStep 3: Testing product filters..."
+    local filter_response=$(make_request "GET" "/products?price_min=20&price_max=40")
+    verify_match "true" "$(echo $filter_response | jq '. | length > 0')" "Price filter results found"
+    
+    echo -e "\nStep 4: Updating product..."
+    local update_data='{
+        "price": 34.99,
+        "description": "Updated product description for timestamp '${TIMESTAMP}'"
+    }'
+    
+    local update_response=$(make_request "PUT" "/products/$PRODUCT_ID" "$update_data")
+    verify_match "34.99" "$(echo $update_response | jq -r '.price')" "Updated product price"
+    
+    echo -e "\nStep 5: Testing product blog integration..."
+    local blog_data='{
+        "title": "Product Review_'${TIMESTAMP}'",
+        "content": "This is a review of Test Product_'${TIMESTAMP}'",
+        "product_ids": ['$PRODUCT_ID']
+    }'
+    
+    local blog_response=$(make_request "POST" "/blog/posts" "$blog_data")
+    local POST_ID=$(echo $blog_response | jq -r '.post_id')
+    
+    local blog_get_response=$(make_request "GET" "/blog/posts/$POST_ID")
+    verify_match "true" "$(echo $blog_get_response | jq '.products | length > 0')" "Blog post has associated product"
+    verify_match "$PRODUCT_ID" "$(echo $blog_get_response | jq -r '.products[0].product_id')" "Correct product associated"
+    
+    TOTAL_TESTS=$((TOTAL_TESTS + 1))
+    [ $PASSED_CHECKS -eq $TOTAL_CHECKS ] && PASSED_TESTS=$((PASSED_TESTS + 1))
+}
+
 # Main execution
 echo "Starting API Tests"
 echo "=========================="
 
+check_server
 test_auth
 test_shelters
 test_pets
 test_quiz
+test_blog
+test_products
 
 echo -e "\n${BLUE}Test Suite Summary${NC}"
 echo "════════════════════════════════"
-echo "Total Test Groups: 4"
 echo "Individual Checks Run: $TOTAL_TESTS"
 echo "Checks Passed: $PASSED_TESTS"
 echo "Checks Failed: $((TOTAL_TESTS - PASSED_TESTS))"
