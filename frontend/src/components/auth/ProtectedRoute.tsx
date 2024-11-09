@@ -1,21 +1,18 @@
-import { Navigate, useLocation } from 'react-router-dom'
-import { useAtomValue } from 'jotai'
-import { isAuthenticatedAtom } from '../../stores/auth'
+import { Navigate, useLocation } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 
-interface ProtectedRouteProps {
-  children: React.ReactNode
-}
+export function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth();
+  const location = useLocation();
 
-function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const isAuthenticated = useAtomValue(isAuthenticatedAtom)
-  const location = useLocation()
-
-  if (!isAuthenticated) {
-    // Redirect to login page but save the attempted url
-    return <Navigate to="/login" state={{ from: location }} replace />
+  if (isLoading) {
+    // You could return a loading spinner here
+    return <div>Loading...</div>;
   }
 
-  return <>{children}</>
-}
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
 
-export default ProtectedRoute
+  return <>{children}</>;
+}
