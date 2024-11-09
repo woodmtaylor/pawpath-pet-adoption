@@ -326,6 +326,116 @@ class PetController {
         }
     }
 }
+=== ./backend/src/api/BlogController.php ===
+<?php
+// src/api/BlogController.php
+namespace PawPath\api;
+
+use PawPath\services\BlogService;
+use Psr\Http\Message\ResponseInterface as Response;
+use Psr\Http\Message\ServerRequestInterface as Request;
+
+class BlogController {
+    private BlogService $blogService;
+    
+    public function __construct() {
+        $this->blogService = new BlogService();
+    }
+    
+    public function createPost(Request $request, Response $response): Response {
+        try {
+            $data = $request->getParsedBody();
+            $data['author_id'] = $request->getAttribute('user_id');
+            
+            $result = $this->blogService->createPost($data);
+            
+            $response->getBody()->write(json_encode($result));
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withStatus(201);
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode([
+                'error' => $e->getMessage()
+            ]));
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withStatus(400);
+        }
+    }
+    
+    public function getPost(Request $request, Response $response, array $args): Response {
+        try {
+            $postId = (int) $args['id'];
+            $result = $this->blogService->getPost($postId);
+            
+            $response->getBody()->write(json_encode($result));
+            return $response->withHeader('Content-Type', 'application/json');
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode([
+                'error' => $e->getMessage()
+            ]));
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withStatus(404);
+        }
+    }
+    
+    public function listPosts(Request $request, Response $response): Response {
+        try {
+            $filters = $request->getQueryParams();
+            $result = $this->blogService->listPosts($filters);
+            
+            $response->getBody()->write(json_encode($result));
+            return $response->withHeader('Content-Type', 'application/json');
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode([
+                'error' => $e->getMessage()
+            ]));
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withStatus(400);
+        }
+    }
+    
+    public function updatePost(Request $request, Response $response, array $args): Response {
+        try {
+            $postId = (int) $args['id'];
+            $data = $request->getParsedBody();
+            
+            // Verify user is the author
+            $userId = $request->getAttribute('user_id');
+            $result = $this->blogService->updatePost($postId, $data, $userId);
+            
+            $response->getBody()->write(json_encode($result));
+            return $response->withHeader('Content-Type', 'application/json');
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode([
+                'error' => $e->getMessage()
+            ]));
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withStatus(400);
+        }
+    }
+    
+    public function deletePost(Request $request, Response $response, array $args): Response {
+        try {
+            $postId = (int) $args['id'];
+            $userId = $request->getAttribute('user_id');
+            
+            $this->blogService->deletePost($postId, $userId);
+            
+            return $response->withStatus(204);
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode([
+                'error' => $e->getMessage()
+            ]));
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withStatus(400);
+        }
+    }
+}
 === ./backend/src/api/QuizController.php ===
 <?php
 namespace PawPath\api;
@@ -538,6 +648,111 @@ class QuizController {
             return $response
                 ->withHeader('Content-Type', 'application/json')
                 ->withStatus(500);
+        }
+    }
+}
+=== ./backend/src/api/ProductController.php ===
+<?php
+// src/api/ProductController.php
+namespace PawPath\api;
+
+use PawPath\services\ProductService;
+use Psr\Http\Message\ResponseInterface as Response;
+use Psr\Http\Message\ServerRequestInterface as Request;
+
+class ProductController {
+    private ProductService $productService;
+    
+    public function __construct() {
+        $this->productService = new ProductService();
+    }
+    
+    public function createProduct(Request $request, Response $response): Response {
+        try {
+            $data = $request->getParsedBody();
+            
+            $result = $this->productService->createProduct($data);
+            
+            $response->getBody()->write(json_encode($result));
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withStatus(201);
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode([
+                'error' => $e->getMessage()
+            ]));
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withStatus(400);
+        }
+    }
+    
+    public function getProduct(Request $request, Response $response, array $args): Response {
+        try {
+            $productId = (int) $args['id'];
+            $result = $this->productService->getProduct($productId);
+            
+            $response->getBody()->write(json_encode($result));
+            return $response->withHeader('Content-Type', 'application/json');
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode([
+                'error' => $e->getMessage()
+            ]));
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withStatus(404);
+        }
+    }
+    
+    public function listProducts(Request $request, Response $response): Response {
+        try {
+            $filters = $request->getQueryParams();
+            $result = $this->productService->listProducts($filters);
+            
+            $response->getBody()->write(json_encode($result));
+            return $response->withHeader('Content-Type', 'application/json');
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode([
+                'error' => $e->getMessage()
+            ]));
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withStatus(400);
+        }
+    }
+    
+    public function updateProduct(Request $request, Response $response, array $args): Response {
+        try {
+            $productId = (int) $args['id'];
+            $data = $request->getParsedBody();
+            
+            $result = $this->productService->updateProduct($productId, $data);
+            
+            $response->getBody()->write(json_encode($result));
+            return $response->withHeader('Content-Type', 'application/json');
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode([
+                'error' => $e->getMessage()
+            ]));
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withStatus(400);
+        }
+    }
+    
+    public function deleteProduct(Request $request, Response $response, array $args): Response {
+        try {
+            $productId = (int) $args['id'];
+            $this->productService->deleteProduct($productId);
+            
+            return $response->withStatus(204);
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode([
+                'error' => $e->getMessage()
+            ]));
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withStatus(400);
         }
     }
 }
@@ -1467,6 +1682,137 @@ class Shelter {
         }
     }
 }
+=== ./backend/src/models/Product.php ===
+<?php
+
+namespace PawPath\models;
+
+use PDOException;
+use PDO;
+use PawPath\config\database\DatabaseConfig;
+
+class Product {
+    private PDO $db;
+    
+    public function __construct() {
+        $this->db = DatabaseConfig::getConnection();
+    }
+    
+    public function create(array $data): int {
+        try {
+            $stmt = $this->db->prepare("
+                INSERT INTO Product (
+                    name,
+                    description,
+                    price,
+                    affiliate_link
+                ) VALUES (?, ?, ?, ?)
+            ");
+            
+            $stmt->execute([
+                $data['name'],
+                $data['description'] ?? null,
+                $data['price'],
+                $data['affiliate_link'] ?? null
+            ]);
+            
+            return (int) $this->db->lastInsertId();
+        } catch (PDOException $e) {
+            error_log("Error creating product: " . $e->getMessage());
+            throw $e;
+        }
+    }
+    
+    public function findById(int $id): ?array {
+        try {
+            $stmt = $this->db->prepare("SELECT * FROM Product WHERE product_id = ?");
+            $stmt->execute([$id]);
+            return $stmt->fetch() ?: null;
+        } catch (PDOException $e) {
+            error_log("Error finding product: " . $e->getMessage());
+            throw $e;
+        }
+    }
+    
+    public function findAll(array $filters = []): array {
+        try {
+            $query = "SELECT * FROM Product WHERE 1=1";
+            $params = [];
+            
+            if (!empty($filters['search'])) {
+                $query .= " AND (name LIKE ? OR description LIKE ?)";
+                $searchTerm = '%' . $filters['search'] . '%';
+                $params[] = $searchTerm;
+                $params[] = $searchTerm;
+            }
+            
+            if (isset($filters['price_min'])) {
+                $query .= " AND price >= ?";
+                $params[] = $filters['price_min'];
+            }
+            
+            if (isset($filters['price_max'])) {
+                $query .= " AND price <= ?";
+                $params[] = $filters['price_max'];
+            }
+            
+            $stmt = $this->db->prepare($query);
+            $stmt->execute($params);
+            return $stmt->fetchAll();
+        } catch (PDOException $e) {
+            error_log("Error finding products: " . $e->getMessage());
+            throw $e;
+        }
+    }
+    
+    public function update(int $id, array $data): bool {
+        try {
+            $fields = [];
+            $params = [];
+            
+            foreach (['name', 'description', 'price', 'affiliate_link'] as $field) {
+                if (isset($data[$field])) {
+                    $fields[] = "$field = ?";
+                    $params[] = $data[$field];
+                }
+            }
+            
+            if (empty($fields)) {
+                return false;
+            }
+            
+            $params[] = $id;
+            $query = "UPDATE Product SET " . implode(', ', $fields) . " WHERE product_id = ?";
+            
+            $stmt = $this->db->prepare($query);
+            return $stmt->execute($params);
+        } catch (PDOException $e) {
+            error_log("Error updating product: " . $e->getMessage());
+            throw $e;
+        }
+    }
+    
+    public function delete(int $id): bool {
+        try {
+            $this->db->beginTransaction();
+            
+            // Delete blog relations first
+            $stmt = $this->db->prepare("DELETE FROM Blog_Product_Relation WHERE product_id = ?");
+            $stmt->execute([$id]);
+            
+            // Delete product
+            $stmt = $this->db->prepare("DELETE FROM Product WHERE product_id = ?");
+            $result = $stmt->execute([$id]);
+            
+            $this->db->commit();
+            return $result;
+        } catch (PDOException $e) {
+            $this->db->rollBack();
+            error_log("Error deleting product: " . $e->getMessage());
+            throw $e;
+        }
+    }
+}
 === ./backend/src/models/User.php ===
 <?php
 // backend/src/models/User.php
@@ -2026,6 +2372,285 @@ Database models matching our schema for:
 - Starting_Quiz
 - Quiz_Result
 - Product
+=== ./backend/src/models/BlogPost.php ===
+<?php
+// src/models/BlogPost.php
+namespace PawPath\models;
+
+use PDO;
+use PDOException;
+use PawPath\config\database\DatabaseConfig;
+
+class BlogPost {
+    private PDO $db;
+    
+    public function __construct() {
+        $this->db = DatabaseConfig::getConnection();
+    }
+    
+    public function create(array $data): int {
+        try {
+            $stmt = $this->db->prepare("
+                INSERT INTO Blog_Post (
+                    title,
+                    content,
+                    publication_date,
+                    author_id
+                ) VALUES (?, ?, CURDATE(), ?)
+            ");
+            
+            $stmt->execute([
+                $data['title'],
+                $data['content'],
+                $data['author_id']
+            ]);
+            
+            $postId = (int) $this->db->lastInsertId();
+            
+            // Handle product relationships if provided
+            if (!empty($data['product_ids'])) {
+                $this->updateProductRelations($postId, $data['product_ids']);
+            }
+            
+            return $postId;
+        } catch (PDOException $e) {
+            error_log("Error creating blog post: " . $e->getMessage());
+            throw $e;
+        }
+    }
+    
+    public function findById(int $id): ?array {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT 
+                    bp.*,
+                    u.username as author_name
+                FROM Blog_Post bp
+                JOIN User u ON bp.author_id = u.user_id
+                WHERE bp.post_id = ?
+            ");
+            
+            $stmt->execute([$id]);
+            $post = $stmt->fetch();
+            
+            if ($post) {
+                // Get related products
+                $stmt = $this->db->prepare("
+                    SELECT p.*
+                    FROM Product p
+                    JOIN Blog_Product_Relation bpr ON p.product_id = bpr.product_id
+                    WHERE bpr.post_id = ?
+                ");
+                $stmt->execute([$id]);
+                $post['products'] = $stmt->fetchAll();
+            }
+            
+            return $post ?: null;
+        } catch (PDOException $e) {
+            error_log("Error finding blog post: " . $e->getMessage());
+            throw $e;
+        }
+    }
+    
+    public function findAll(array $filters = []): array {
+        try {
+            $query = "
+                SELECT 
+                    bp.*,
+                    u.username as author_name
+                FROM Blog_Post bp
+                JOIN User u ON bp.author_id = u.user_id
+                WHERE 1=1
+            ";
+            $params = [];
+            
+            if (!empty($filters['search'])) {
+                $query .= " AND (
+                    bp.title LIKE ? OR 
+                    bp.content LIKE ? OR 
+                    bp.title LIKE ?
+                )";
+                $searchTerm = '%' . $filters['search'] . '%';
+                $params[] = $searchTerm;
+                $params[] = $searchTerm;
+                $params[] = $searchTerm;
+            }
+            
+            // Always order by newest first
+            $query .= " ORDER BY bp.post_id DESC";
+            
+            $stmt = $this->db->prepare($query);
+            $stmt->execute($params);
+            return $stmt->fetchAll();
+        } catch (PDOException $e) {
+            error_log("Error finding blog posts: " . $e->getMessage());
+            throw $e;
+        }
+    }
+        
+    public function update(int $id, array $data): bool {
+        try {
+            $this->db->beginTransaction();
+            
+            $fields = [];
+            $params = [];
+            
+            if (isset($data['title'])) {
+                $fields[] = "title = ?";
+                $params[] = $data['title'];
+            }
+            
+            if (isset($data['content'])) {
+                $fields[] = "content = ?";
+                $params[] = $data['content'];
+            }
+            
+            if (!empty($fields)) {
+                $params[] = $id;
+                $query = "UPDATE Blog_Post SET " . implode(', ', $fields) . " WHERE post_id = ?";
+                
+                $stmt = $this->db->prepare($query);
+                $stmt->execute($params);
+            }
+            
+            // Update product relations if provided
+            if (isset($data['product_ids'])) {
+                $this->updateProductRelations($id, $data['product_ids']);
+            }
+            
+            $this->db->commit();
+            return true;
+        } catch (PDOException $e) {
+            $this->db->rollBack();
+            error_log("Error updating blog post: " . $e->getMessage());
+            throw $e;
+        }
+    }
+    
+    public function delete(int $id): bool {
+        try {
+            $this->db->beginTransaction();
+            
+            // Delete product relations first
+            $stmt = $this->db->prepare("DELETE FROM Blog_Product_Relation WHERE post_id = ?");
+            $stmt->execute([$id]);
+            
+            // Delete blog post
+            $stmt = $this->db->prepare("DELETE FROM Blog_Post WHERE post_id = ?");
+            $result = $stmt->execute([$id]);
+            
+            $this->db->commit();
+            return $result;
+        } catch (PDOException $e) {
+            $this->db->rollBack();
+            error_log("Error deleting blog post: " . $e->getMessage());
+            throw $e;
+        }
+    }
+    
+    private function updateProductRelations(int $postId, array $productIds): void {
+        // Remove existing relations
+        $stmt = $this->db->prepare("DELETE FROM Blog_Product_Relation WHERE post_id = ?");
+        $stmt->execute([$postId]);
+        
+        // Add new relations
+        $stmt = $this->db->prepare("
+            INSERT INTO Blog_Product_Relation (post_id, product_id)
+            VALUES (?, ?)
+        ");
+        
+        foreach ($productIds as $productId) {
+            $stmt->execute([$postId, $productId]);
+        }
+    }
+}
+=== ./backend/src/services/ProductService.php ===
+<?php
+
+namespace PawPath\services;
+
+use PawPath\models\Product;
+use RuntimeException;
+
+class ProductService {
+    private Product $productModel;
+    
+    public function __construct() {
+        $this->productModel = new Product();
+    }
+    
+    public function createProduct(array $data): array {
+        // Validate required fields
+        if (empty($data['name']) || !isset($data['price'])) {
+            throw new RuntimeException("Name and price are required");
+        }
+        
+        // Validate price
+        if ($data['price'] < 0) {
+            throw new RuntimeException("Price cannot be negative");
+        }
+        
+        // Create product
+        $productId = $this->productModel->create($data);
+        return $this->productModel->findById($productId);
+    }
+    
+    public function getProduct(int $id): array {
+        $product = $this->productModel->findById($id);
+        if (!$product) {
+            throw new RuntimeException("Product not found");
+        }
+        return $product;
+    }
+    
+    public function listProducts(array $filters = []): array {
+        // Validate price filters
+        if (isset($filters['price_min']) && $filters['price_min'] < 0) {
+            throw new RuntimeException("Minimum price cannot be negative");
+        }
+        
+        if (isset($filters['price_max']) && $filters['price_max'] < 0) {
+            throw new RuntimeException("Maximum price cannot be negative");
+        }
+        
+        if (isset($filters['price_min'], $filters['price_max']) 
+            && $filters['price_min'] > $filters['price_max']) {
+            throw new RuntimeException("Minimum price cannot be greater than maximum price");
+        }
+        
+        return $this->productModel->findAll($filters);
+    }
+    
+    public function updateProduct(int $id, array $data): array {
+        // Verify product exists
+        $product = $this->productModel->findById($id);
+        if (!$product) {
+            throw new RuntimeException("Product not found");
+        }
+        
+        // Validate price if provided
+        if (isset($data['price']) && $data['price'] < 0) {
+            throw new RuntimeException("Price cannot be negative");
+        }
+        
+        // Update product
+        $this->productModel->update($id, $data);
+        return $this->productModel->findById($id);
+    }
+    
+    public function deleteProduct(int $id): void {
+        // Verify product exists
+        $product = $this->productModel->findById($id);
+        if (!$product) {
+            throw new RuntimeException("Product not found");
+        }
+        
+        // Delete product
+        if (!$this->productModel->delete($id)) {
+            throw new RuntimeException("Failed to delete product");
+        }
+    }
+}
 === ./backend/src/services/AdoptionService.php ===
 <?php
 // backend/src/services/AdoptionService.php
@@ -2493,6 +3118,85 @@ Business logic for:
 - Quiz Processing
 - Blog Management
 - Affiliate Management
+=== ./backend/src/services/BlogService.php ===
+<?php
+// src/services/BlogService.php
+namespace PawPath\services;
+
+use PawPath\models\BlogPost;
+use PawPath\models\User;
+use RuntimeException;
+
+class BlogService {
+    private BlogPost $blogModel;
+    private User $userModel;
+    
+    public function __construct() {
+        $this->blogModel = new BlogPost();
+        $this->userModel = new User();
+    }
+    
+    public function createPost(array $data): array {
+        // Validate required fields
+        if (empty($data['title']) || empty($data['content'])) {
+            throw new RuntimeException("Title and content are required");
+        }
+        
+        // Verify author exists
+        if (!$this->userModel->findById($data['author_id'])) {
+            throw new RuntimeException("Invalid author");
+        }
+        
+        // Create post
+        $postId = $this->blogModel->create($data);
+        return $this->blogModel->findById($postId);
+    }
+    
+    public function getPost(int $id): array {
+        $post = $this->blogModel->findById($id);
+        if (!$post) {
+            throw new RuntimeException("Post not found");
+        }
+        return $post;
+    }
+    
+    public function listPosts(array $filters = []): array {
+        return $this->blogModel->findAll($filters);
+    }
+    
+    public function updatePost(int $id, array $data, int $userId): array {
+        // Verify post exists and user is the author
+        $post = $this->blogModel->findById($id);
+        if (!$post) {
+            throw new RuntimeException("Post not found");
+        }
+        
+        if ($post['author_id'] !== $userId) {
+            throw new RuntimeException("Unauthorized to update this post");
+        }
+        
+        // Update post
+        $this->blogModel->update($id, $data);
+        return $this->blogModel->findById($id);
+    }
+    
+    public function deletePost(int $id, int $userId): void {
+        // Verify post exists and user is the author
+        $post = $this->blogModel->findById($id);
+        if (!$post) {
+            throw new RuntimeException("Post not found");
+        }
+        
+        if ($post['author_id'] !== $userId) {
+            throw new RuntimeException("Unauthorized to delete this post");
+        }
+        
+        // Delete post
+        if (!$this->blogModel->delete($id)) {
+            throw new RuntimeException("Failed to delete post");
+        }
+    }
+}
 === ./backend/src/services/QuizService.php ===
 <?php
 // src/services/QuizService.php
@@ -3858,6 +4562,20 @@ verify_match() {
     fi
 }
 
+check_server() {
+    echo "Checking server status..."
+    local response=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/auth/login)
+    
+    if [ "$response" = "000" ]; then
+        echo "Error: Cannot connect to server at http://localhost:8000"
+        echo "Please ensure the PHP server is running with:"
+        echo "php -S localhost:8000 -t public/"
+        exit 1
+    else
+        echo "Server is reachable"
+    fi
+}
+
 make_request() {
     local method=$1
     local endpoint=$2
@@ -3874,11 +4592,28 @@ make_request() {
         curl_cmd="$curl_cmd -d '${data}'"
     fi
     
-    # Debug output to stderr
-    echo "→ ${method} ${endpoint}" >&2
+    # Debug output
+    # echo "Request command: $curl_cmd '${BASE_URL}${endpoint}'" >&2
     
-    # Execute request
-    eval $curl_cmd "'${BASE_URL}${endpoint}'"
+    # Execute request and capture response with error handling
+    local response=$(eval $curl_cmd "'${BASE_URL}${endpoint}'" 2>&1)
+    local status=$?
+    
+    if [ $status -ne 0 ]; then
+        echo "Curl command failed with status $status" >&2
+        echo "Error: $response" >&2
+        return 1
+    fi
+    
+    # Debug output
+    # echo "Raw response: $response" >&2
+    
+    # Check if response is valid JSON
+    if ! echo "$response" | jq '.' >/dev/null 2>&1; then
+        echo "Warning: Response is not valid JSON: $response" >&2
+    fi
+    
+    echo "$response"
 }
 
 summarize_quiz_response() {
@@ -4036,12 +4771,6 @@ test_pets() {
             fi
         fi
     fi
-    
-    echo -e "\nTest Summary:"
-    echo "════════════════"
-    echo "Total Verifications: $TOTAL_CHECKS"
-    echo "Passed: $PASSED_CHECKS"
-    echo "Failed: $((TOTAL_CHECKS - PASSED_CHECKS))"
 
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
     [ $PASSED_CHECKS -eq $TOTAL_CHECKS ] && PASSED_TESTS=$((PASSED_TESTS + 1))
@@ -4073,18 +4802,133 @@ test_quiz() {
     [ $PASSED_CHECKS -eq $TOTAL_CHECKS ] && PASSED_TESTS=$((PASSED_TESTS + 1))
 }
 
+test_blog() {
+    TOTAL_CHECKS=0
+    PASSED_CHECKS=0
+    
+    echo -e "\n${BLUE}Testing Blog Post Endpoints${NC}"
+    echo "════════════════════════════════"
+    
+    echo "Step 1: Creating blog post..."
+    local post_data='{
+        "title": "Test Blog Post_'${TIMESTAMP}'",
+        "content": "This is a test blog post content with a timestamp of '${TIMESTAMP}'",
+        "product_ids": []
+    }'
+    
+    local post_response=$(make_request "POST" "/blog/posts" "$post_data")
+    local POST_ID=$(echo $post_response | jq -r '.post_id')
+    verify_match "true" "$(echo $post_response | jq 'has("post_id")')" "Blog post created"
+    
+    echo -e "\nStep 2: Verifying blog post details..."
+    local get_response=$(make_request "GET" "/blog/posts/$POST_ID")
+    verify_match "Test Blog Post_${TIMESTAMP}" "$(echo $get_response | jq -r '.title')" "Post title"
+    verify_match "true" "$(echo $get_response | jq -r '.content | contains("test blog post content")')" "Post content contains test text"
+    
+    echo -e "\nStep 3: Updating blog post..."
+    local update_data='{
+        "title": "Updated Test Blog Post_'${TIMESTAMP}'",
+        "content": "This is updated content for timestamp '${TIMESTAMP}'"
+    }'
+    
+    local update_response=$(make_request "PUT" "/blog/posts/$POST_ID" "$update_data")
+    verify_match "Updated Test Blog Post_${TIMESTAMP}" "$(echo $update_response | jq -r '.title')" "Updated post title"
+    
+
+    echo "Step 4: Testing blog post search..."
+    # First try exact title match
+    local title_search=$(make_request "GET" "/blog/posts?search=Updated%20Test%20Blog%20Post_${TIMESTAMP}")
+    # debug
+    # echo "Title search response: $title_search" >&2
+
+    # Then try partial match
+    local partial_search=$(make_request "GET" "/blog/posts?search=Updated%20Test")
+    # debug
+    # echo "Partial search response: $partial_search" >&2
+
+    # Use the partial search for verification
+    verify_match "true" "$(echo $partial_search | jq 'length > 0')" "Search results found"
+
+    # If we got results, verify the latest post matches
+    if [ "$(echo $partial_search | jq 'length > 0')" = "true" ]; then
+        # Get the most recent post (highest post_id)
+        local latest_post=$(echo $partial_search | jq 'sort_by(.post_id) | last')
+        verify_match "Updated Test Blog Post_${TIMESTAMP}" "$(echo $latest_post | jq -r '.title')" "Search result title matches"
+    fi
+    
+    TOTAL_TESTS=$((TOTAL_TESTS + 1))
+    [ $PASSED_CHECKS -eq $TOTAL_CHECKS ] && PASSED_TESTS=$((PASSED_TESTS + 1))
+}
+
+test_products() {
+    TOTAL_CHECKS=0
+    PASSED_CHECKS=0
+    
+    echo -e "\n${BLUE}Testing Product Endpoints${NC}"
+    echo "════════════════════════════════"
+    
+    echo "Step 1: Creating product..."
+    local product_data='{
+        "name": "Test Product_'${TIMESTAMP}'",
+        "description": "This is a test product description",
+        "price": 29.99,
+        "affiliate_link": "https://example.com/product_'${TIMESTAMP}'"
+    }'
+    
+    local product_response=$(make_request "POST" "/products" "$product_data")
+    local PRODUCT_ID=$(echo $product_response | jq -r '.product_id')
+    verify_match "true" "$(echo $product_response | jq 'has("product_id")')" "Product created"
+    
+    echo -e "\nStep 2: Verifying product details..."
+    local get_response=$(make_request "GET" "/products/$PRODUCT_ID")
+    verify_match "Test Product_${TIMESTAMP}" "$(echo $get_response | jq -r '.name')" "Product name"
+    verify_match "29.99" "$(echo $get_response | jq -r '.price')" "Product price"
+    
+    echo -e "\nStep 3: Testing product filters..."
+    local filter_response=$(make_request "GET" "/products?price_min=20&price_max=40")
+    verify_match "true" "$(echo $filter_response | jq '. | length > 0')" "Price filter results found"
+    
+    echo -e "\nStep 4: Updating product..."
+    local update_data='{
+        "price": 34.99,
+        "description": "Updated product description for timestamp '${TIMESTAMP}'"
+    }'
+    
+    local update_response=$(make_request "PUT" "/products/$PRODUCT_ID" "$update_data")
+    verify_match "34.99" "$(echo $update_response | jq -r '.price')" "Updated product price"
+    
+    echo -e "\nStep 5: Testing product blog integration..."
+    local blog_data='{
+        "title": "Product Review_'${TIMESTAMP}'",
+        "content": "This is a review of Test Product_'${TIMESTAMP}'",
+        "product_ids": ['$PRODUCT_ID']
+    }'
+    
+    local blog_response=$(make_request "POST" "/blog/posts" "$blog_data")
+    local POST_ID=$(echo $blog_response | jq -r '.post_id')
+    
+    local blog_get_response=$(make_request "GET" "/blog/posts/$POST_ID")
+    verify_match "true" "$(echo $blog_get_response | jq '.products | length > 0')" "Blog post has associated product"
+    verify_match "$PRODUCT_ID" "$(echo $blog_get_response | jq -r '.products[0].product_id')" "Correct product associated"
+    
+    TOTAL_TESTS=$((TOTAL_TESTS + 1))
+    [ $PASSED_CHECKS -eq $TOTAL_CHECKS ] && PASSED_TESTS=$((PASSED_TESTS + 1))
+}
+
 # Main execution
 echo "Starting API Tests"
 echo "=========================="
 
+check_server
 test_auth
 test_shelters
 test_pets
 test_quiz
+test_blog
+test_products
 
 echo -e "\n${BLUE}Test Suite Summary${NC}"
 echo "════════════════════════════════"
-echo "Total Test Groups: 4"
 echo "Individual Checks Run: $TOTAL_TESTS"
 echo "Checks Passed: $PASSED_TESTS"
 echo "Checks Failed: $((TOTAL_TESTS - PASSED_TESTS))"
@@ -4105,6 +4949,8 @@ use PawPath\api\PetController;
 use PawPath\api\QuizController;
 use PawPath\api\AdoptionController;
 use PawPath\middleware\AuthMiddleware;
+use PawPath\api\BlogController;
+use PawPath\api\ProductController;
 
 require __DIR__ . '/../vendor/autoload.php';
 
@@ -4248,31 +5094,63 @@ $app->group('/api', function ($group) {
         $controller = new AdoptionController();
         return $controller->updateApplicationStatus($request, $response, $args);
     });
+
+    // Blog routes
+    $group->post('/blog/posts', function ($request, $response) {
+        $controller = new BlogController();
+        return $controller->createPost($request, $response);
+    });
+
+    $group->get('/blog/posts', function ($request, $response) {
+        $controller = new BlogController();
+        return $controller->listPosts($request, $response);
+    });
+
+    $group->get('/blog/posts/{id}', function ($request, $response, $args) {
+        $controller = new BlogController();
+        return $controller->getPost($request, $response, $args);
+    });
+
+    $group->put('/blog/posts/{id}', function ($request, $response, $args) {
+        $controller = new BlogController();
+        return $controller->updatePost($request, $response, $args);
+    });
+
+    $group->delete('/blog/posts/{id}', function ($request, $response, $args) {
+        $controller = new BlogController();
+        return $controller->deletePost($request, $response, $args);
+    });
+
+    // Product routes
+    $group->post('/products', function ($request, $response) {
+        $controller = new ProductController();
+        return $controller->createProduct($request, $response);
+    });
+
+    $group->get('/products', function ($request, $response) {
+        $controller = new ProductController();
+        return $controller->listProducts($request, $response);
+    });
+
+    $group->get('/products/{id}', function ($request, $response, $args) {
+        $controller = new ProductController();
+        return $controller->getProduct($request, $response, $args);
+    });
+
+    $group->put('/products/{id}', function ($request, $response, $args) {
+        $controller = new ProductController();
+        return $controller->updateProduct($request, $response, $args);
+    });
+
+    $group->delete('/products/{id}', function ($request, $response, $args) {
+        $controller = new ProductController();
+        return $controller->deleteProduct($request, $response, $args);
+    });
+
 })->add(new AuthMiddleware());
 
 // Run the app
 $app->run();
-=== ./backend/composer.json ===
-{
-    "name": "pawpath/pet-adoption",
-    "description": "PawPath - Pet Adoption Database and Community Platform",
-    "type": "project",
-    "require": {
-        "php": "^8.1",
-        "slim/slim": "^4.11",
-        "slim/psr7": "^1.7",
-        "php-di/php-di": "^7.0",
-        "vlucas/phpdotenv": "^5.5",
-        "firebase/php-jwt": "^6.4"
-    },
-    "autoload": {
-        "psr-4": {
-            "PawPath\\": "src/"
-        }
-    }
-}
-=== ./backend/sudo ===
-=== ./backend/database/schema.sql ===
 === ./backend/.env ===
 DB_HOST=localhost
 DB_PORT=3306
@@ -4288,1412 +5166,6 @@ JWT_SECRET=AnotherRandomStringForJwtTesting123456789
 # PawPath Backend
 
 This directory contains the PHP backend for the PawPath pet adoption platform.
-=== ./backend/composer.lock ===
-{
-    "_readme": [
-        "This file locks the dependencies of your project to a known state",
-        "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
-        "This file is @generated automatically"
-    ],
-    "content-hash": "2044128a1b9a2859b18658fc4941a783",
-    "packages": [
-        {
-            "name": "fig/http-message-util",
-            "version": "1.1.5",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/php-fig/http-message-util.git",
-                "reference": "9d94dc0154230ac39e5bf89398b324a86f63f765"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/php-fig/http-message-util/zipball/9d94dc0154230ac39e5bf89398b324a86f63f765",
-                "reference": "9d94dc0154230ac39e5bf89398b324a86f63f765",
-                "shasum": ""
-            },
-            "require": {
-                "php": "^5.3 || ^7.0 || ^8.0"
-            },
-            "suggest": {
-                "psr/http-message": "The package containing the PSR-7 interfaces"
-            },
-            "type": "library",
-            "extra": {
-                "branch-alias": {
-                    "dev-master": "1.1.x-dev"
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Fig\\Http\\Message\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "PHP-FIG",
-                    "homepage": "https://www.php-fig.org/"
-                }
-            ],
-            "description": "Utility classes and constants for use with PSR-7 (psr/http-message)",
-            "keywords": [
-                "http",
-                "http-message",
-                "psr",
-                "psr-7",
-                "request",
-                "response"
-            ],
-            "support": {
-                "issues": "https://github.com/php-fig/http-message-util/issues",
-                "source": "https://github.com/php-fig/http-message-util/tree/1.1.5"
-            },
-            "time": "2020-11-24T22:02:12+00:00"
-        },
-        {
-            "name": "firebase/php-jwt",
-            "version": "v6.10.1",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/firebase/php-jwt.git",
-                "reference": "500501c2ce893c824c801da135d02661199f60c5"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/firebase/php-jwt/zipball/500501c2ce893c824c801da135d02661199f60c5",
-                "reference": "500501c2ce893c824c801da135d02661199f60c5",
-                "shasum": ""
-            },
-            "require": {
-                "php": "^8.0"
-            },
-            "require-dev": {
-                "guzzlehttp/guzzle": "^7.4",
-                "phpspec/prophecy-phpunit": "^2.0",
-                "phpunit/phpunit": "^9.5",
-                "psr/cache": "^2.0||^3.0",
-                "psr/http-client": "^1.0",
-                "psr/http-factory": "^1.0"
-            },
-            "suggest": {
-                "ext-sodium": "Support EdDSA (Ed25519) signatures",
-                "paragonie/sodium_compat": "Support EdDSA (Ed25519) signatures when libsodium is not present"
-            },
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "Firebase\\JWT\\": "src"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "BSD-3-Clause"
-            ],
-            "authors": [
-                {
-                    "name": "Neuman Vong",
-                    "email": "neuman+pear@twilio.com",
-                    "role": "Developer"
-                },
-                {
-                    "name": "Anant Narayanan",
-                    "email": "anant@php.net",
-                    "role": "Developer"
-                }
-            ],
-            "description": "A simple library to encode and decode JSON Web Tokens (JWT) in PHP. Should conform to the current spec.",
-            "homepage": "https://github.com/firebase/php-jwt",
-            "keywords": [
-                "jwt",
-                "php"
-            ],
-            "support": {
-                "issues": "https://github.com/firebase/php-jwt/issues",
-                "source": "https://github.com/firebase/php-jwt/tree/v6.10.1"
-            },
-            "time": "2024-05-18T18:05:11+00:00"
-        },
-        {
-            "name": "graham-campbell/result-type",
-            "version": "v1.1.3",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/GrahamCampbell/Result-Type.git",
-                "reference": "3ba905c11371512af9d9bdd27d99b782216b6945"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/GrahamCampbell/Result-Type/zipball/3ba905c11371512af9d9bdd27d99b782216b6945",
-                "reference": "3ba905c11371512af9d9bdd27d99b782216b6945",
-                "shasum": ""
-            },
-            "require": {
-                "php": "^7.2.5 || ^8.0",
-                "phpoption/phpoption": "^1.9.3"
-            },
-            "require-dev": {
-                "phpunit/phpunit": "^8.5.39 || ^9.6.20 || ^10.5.28"
-            },
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "GrahamCampbell\\ResultType\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Graham Campbell",
-                    "email": "hello@gjcampbell.co.uk",
-                    "homepage": "https://github.com/GrahamCampbell"
-                }
-            ],
-            "description": "An Implementation Of The Result Type",
-            "keywords": [
-                "Graham Campbell",
-                "GrahamCampbell",
-                "Result Type",
-                "Result-Type",
-                "result"
-            ],
-            "support": {
-                "issues": "https://github.com/GrahamCampbell/Result-Type/issues",
-                "source": "https://github.com/GrahamCampbell/Result-Type/tree/v1.1.3"
-            },
-            "funding": [
-                {
-                    "url": "https://github.com/GrahamCampbell",
-                    "type": "github"
-                },
-                {
-                    "url": "https://tidelift.com/funding/github/packagist/graham-campbell/result-type",
-                    "type": "tidelift"
-                }
-            ],
-            "time": "2024-07-20T21:45:45+00:00"
-        },
-        {
-            "name": "laravel/serializable-closure",
-            "version": "v1.3.5",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/laravel/serializable-closure.git",
-                "reference": "1dc4a3dbfa2b7628a3114e43e32120cce7cdda9c"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/laravel/serializable-closure/zipball/1dc4a3dbfa2b7628a3114e43e32120cce7cdda9c",
-                "reference": "1dc4a3dbfa2b7628a3114e43e32120cce7cdda9c",
-                "shasum": ""
-            },
-            "require": {
-                "php": "^7.3|^8.0"
-            },
-            "require-dev": {
-                "illuminate/support": "^8.0|^9.0|^10.0|^11.0",
-                "nesbot/carbon": "^2.61|^3.0",
-                "pestphp/pest": "^1.21.3",
-                "phpstan/phpstan": "^1.8.2",
-                "symfony/var-dumper": "^5.4.11|^6.2.0|^7.0.0"
-            },
-            "type": "library",
-            "extra": {
-                "branch-alias": {
-                    "dev-master": "1.x-dev"
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Laravel\\SerializableClosure\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Taylor Otwell",
-                    "email": "taylor@laravel.com"
-                },
-                {
-                    "name": "Nuno Maduro",
-                    "email": "nuno@laravel.com"
-                }
-            ],
-            "description": "Laravel Serializable Closure provides an easy and secure way to serialize closures in PHP.",
-            "keywords": [
-                "closure",
-                "laravel",
-                "serializable"
-            ],
-            "support": {
-                "issues": "https://github.com/laravel/serializable-closure/issues",
-                "source": "https://github.com/laravel/serializable-closure"
-            },
-            "time": "2024-09-23T13:33:08+00:00"
-        },
-        {
-            "name": "nikic/fast-route",
-            "version": "v1.3.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/nikic/FastRoute.git",
-                "reference": "181d480e08d9476e61381e04a71b34dc0432e812"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/nikic/FastRoute/zipball/181d480e08d9476e61381e04a71b34dc0432e812",
-                "reference": "181d480e08d9476e61381e04a71b34dc0432e812",
-                "shasum": ""
-            },
-            "require": {
-                "php": ">=5.4.0"
-            },
-            "require-dev": {
-                "phpunit/phpunit": "^4.8.35|~5.7"
-            },
-            "type": "library",
-            "autoload": {
-                "files": [
-                    "src/functions.php"
-                ],
-                "psr-4": {
-                    "FastRoute\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "BSD-3-Clause"
-            ],
-            "authors": [
-                {
-                    "name": "Nikita Popov",
-                    "email": "nikic@php.net"
-                }
-            ],
-            "description": "Fast request router for PHP",
-            "keywords": [
-                "router",
-                "routing"
-            ],
-            "support": {
-                "issues": "https://github.com/nikic/FastRoute/issues",
-                "source": "https://github.com/nikic/FastRoute/tree/master"
-            },
-            "time": "2018-02-13T20:26:39+00:00"
-        },
-        {
-            "name": "php-di/invoker",
-            "version": "2.3.4",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/PHP-DI/Invoker.git",
-                "reference": "33234b32dafa8eb69202f950a1fc92055ed76a86"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/PHP-DI/Invoker/zipball/33234b32dafa8eb69202f950a1fc92055ed76a86",
-                "reference": "33234b32dafa8eb69202f950a1fc92055ed76a86",
-                "shasum": ""
-            },
-            "require": {
-                "php": ">=7.3",
-                "psr/container": "^1.0|^2.0"
-            },
-            "require-dev": {
-                "athletic/athletic": "~0.1.8",
-                "mnapoli/hard-mode": "~0.3.0",
-                "phpunit/phpunit": "^9.0"
-            },
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "Invoker\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "description": "Generic and extensible callable invoker",
-            "homepage": "https://github.com/PHP-DI/Invoker",
-            "keywords": [
-                "callable",
-                "dependency",
-                "dependency-injection",
-                "injection",
-                "invoke",
-                "invoker"
-            ],
-            "support": {
-                "issues": "https://github.com/PHP-DI/Invoker/issues",
-                "source": "https://github.com/PHP-DI/Invoker/tree/2.3.4"
-            },
-            "funding": [
-                {
-                    "url": "https://github.com/mnapoli",
-                    "type": "github"
-                }
-            ],
-            "time": "2023-09-08T09:24:21+00:00"
-        },
-        {
-            "name": "php-di/php-di",
-            "version": "7.0.7",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/PHP-DI/PHP-DI.git",
-                "reference": "e87435e3c0e8f22977adc5af0d5cdcc467e15cf1"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/PHP-DI/PHP-DI/zipball/e87435e3c0e8f22977adc5af0d5cdcc467e15cf1",
-                "reference": "e87435e3c0e8f22977adc5af0d5cdcc467e15cf1",
-                "shasum": ""
-            },
-            "require": {
-                "laravel/serializable-closure": "^1.0",
-                "php": ">=8.0",
-                "php-di/invoker": "^2.0",
-                "psr/container": "^1.1 || ^2.0"
-            },
-            "provide": {
-                "psr/container-implementation": "^1.0"
-            },
-            "require-dev": {
-                "friendsofphp/php-cs-fixer": "^3",
-                "friendsofphp/proxy-manager-lts": "^1",
-                "mnapoli/phpunit-easymock": "^1.3",
-                "phpunit/phpunit": "^9.5",
-                "vimeo/psalm": "^4.6"
-            },
-            "suggest": {
-                "friendsofphp/proxy-manager-lts": "Install it if you want to use lazy injection (version ^1)"
-            },
-            "type": "library",
-            "autoload": {
-                "files": [
-                    "src/functions.php"
-                ],
-                "psr-4": {
-                    "DI\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "description": "The dependency injection container for humans",
-            "homepage": "https://php-di.org/",
-            "keywords": [
-                "PSR-11",
-                "container",
-                "container-interop",
-                "dependency injection",
-                "di",
-                "ioc",
-                "psr11"
-            ],
-            "support": {
-                "issues": "https://github.com/PHP-DI/PHP-DI/issues",
-                "source": "https://github.com/PHP-DI/PHP-DI/tree/7.0.7"
-            },
-            "funding": [
-                {
-                    "url": "https://github.com/mnapoli",
-                    "type": "github"
-                },
-                {
-                    "url": "https://tidelift.com/funding/github/packagist/php-di/php-di",
-                    "type": "tidelift"
-                }
-            ],
-            "time": "2024-07-21T15:55:45+00:00"
-        },
-        {
-            "name": "phpoption/phpoption",
-            "version": "1.9.3",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/schmittjoh/php-option.git",
-                "reference": "e3fac8b24f56113f7cb96af14958c0dd16330f54"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/schmittjoh/php-option/zipball/e3fac8b24f56113f7cb96af14958c0dd16330f54",
-                "reference": "e3fac8b24f56113f7cb96af14958c0dd16330f54",
-                "shasum": ""
-            },
-            "require": {
-                "php": "^7.2.5 || ^8.0"
-            },
-            "require-dev": {
-                "bamarni/composer-bin-plugin": "^1.8.2",
-                "phpunit/phpunit": "^8.5.39 || ^9.6.20 || ^10.5.28"
-            },
-            "type": "library",
-            "extra": {
-                "bamarni-bin": {
-                    "bin-links": true,
-                    "forward-command": false
-                },
-                "branch-alias": {
-                    "dev-master": "1.9-dev"
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "PhpOption\\": "src/PhpOption/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "Apache-2.0"
-            ],
-            "authors": [
-                {
-                    "name": "Johannes M. Schmitt",
-                    "email": "schmittjoh@gmail.com",
-                    "homepage": "https://github.com/schmittjoh"
-                },
-                {
-                    "name": "Graham Campbell",
-                    "email": "hello@gjcampbell.co.uk",
-                    "homepage": "https://github.com/GrahamCampbell"
-                }
-            ],
-            "description": "Option Type for PHP",
-            "keywords": [
-                "language",
-                "option",
-                "php",
-                "type"
-            ],
-            "support": {
-                "issues": "https://github.com/schmittjoh/php-option/issues",
-                "source": "https://github.com/schmittjoh/php-option/tree/1.9.3"
-            },
-            "funding": [
-                {
-                    "url": "https://github.com/GrahamCampbell",
-                    "type": "github"
-                },
-                {
-                    "url": "https://tidelift.com/funding/github/packagist/phpoption/phpoption",
-                    "type": "tidelift"
-                }
-            ],
-            "time": "2024-07-20T21:41:07+00:00"
-        },
-        {
-            "name": "psr/container",
-            "version": "2.0.2",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/php-fig/container.git",
-                "reference": "c71ecc56dfe541dbd90c5360474fbc405f8d5963"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/php-fig/container/zipball/c71ecc56dfe541dbd90c5360474fbc405f8d5963",
-                "reference": "c71ecc56dfe541dbd90c5360474fbc405f8d5963",
-                "shasum": ""
-            },
-            "require": {
-                "php": ">=7.4.0"
-            },
-            "type": "library",
-            "extra": {
-                "branch-alias": {
-                    "dev-master": "2.0.x-dev"
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Psr\\Container\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "PHP-FIG",
-                    "homepage": "https://www.php-fig.org/"
-                }
-            ],
-            "description": "Common Container Interface (PHP FIG PSR-11)",
-            "homepage": "https://github.com/php-fig/container",
-            "keywords": [
-                "PSR-11",
-                "container",
-                "container-interface",
-                "container-interop",
-                "psr"
-            ],
-            "support": {
-                "issues": "https://github.com/php-fig/container/issues",
-                "source": "https://github.com/php-fig/container/tree/2.0.2"
-            },
-            "time": "2021-11-05T16:47:00+00:00"
-        },
-        {
-            "name": "psr/http-factory",
-            "version": "1.1.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/php-fig/http-factory.git",
-                "reference": "2b4765fddfe3b508ac62f829e852b1501d3f6e8a"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/php-fig/http-factory/zipball/2b4765fddfe3b508ac62f829e852b1501d3f6e8a",
-                "reference": "2b4765fddfe3b508ac62f829e852b1501d3f6e8a",
-                "shasum": ""
-            },
-            "require": {
-                "php": ">=7.1",
-                "psr/http-message": "^1.0 || ^2.0"
-            },
-            "type": "library",
-            "extra": {
-                "branch-alias": {
-                    "dev-master": "1.0.x-dev"
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Psr\\Http\\Message\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "PHP-FIG",
-                    "homepage": "https://www.php-fig.org/"
-                }
-            ],
-            "description": "PSR-17: Common interfaces for PSR-7 HTTP message factories",
-            "keywords": [
-                "factory",
-                "http",
-                "message",
-                "psr",
-                "psr-17",
-                "psr-7",
-                "request",
-                "response"
-            ],
-            "support": {
-                "source": "https://github.com/php-fig/http-factory"
-            },
-            "time": "2024-04-15T12:06:14+00:00"
-        },
-        {
-            "name": "psr/http-message",
-            "version": "2.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/php-fig/http-message.git",
-                "reference": "402d35bcb92c70c026d1a6a9883f06b2ead23d71"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/php-fig/http-message/zipball/402d35bcb92c70c026d1a6a9883f06b2ead23d71",
-                "reference": "402d35bcb92c70c026d1a6a9883f06b2ead23d71",
-                "shasum": ""
-            },
-            "require": {
-                "php": "^7.2 || ^8.0"
-            },
-            "type": "library",
-            "extra": {
-                "branch-alias": {
-                    "dev-master": "2.0.x-dev"
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Psr\\Http\\Message\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "PHP-FIG",
-                    "homepage": "https://www.php-fig.org/"
-                }
-            ],
-            "description": "Common interface for HTTP messages",
-            "homepage": "https://github.com/php-fig/http-message",
-            "keywords": [
-                "http",
-                "http-message",
-                "psr",
-                "psr-7",
-                "request",
-                "response"
-            ],
-            "support": {
-                "source": "https://github.com/php-fig/http-message/tree/2.0"
-            },
-            "time": "2023-04-04T09:54:51+00:00"
-        },
-        {
-            "name": "psr/http-server-handler",
-            "version": "1.0.2",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/php-fig/http-server-handler.git",
-                "reference": "84c4fb66179be4caaf8e97bd239203245302e7d4"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/php-fig/http-server-handler/zipball/84c4fb66179be4caaf8e97bd239203245302e7d4",
-                "reference": "84c4fb66179be4caaf8e97bd239203245302e7d4",
-                "shasum": ""
-            },
-            "require": {
-                "php": ">=7.0",
-                "psr/http-message": "^1.0 || ^2.0"
-            },
-            "type": "library",
-            "extra": {
-                "branch-alias": {
-                    "dev-master": "1.0.x-dev"
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Psr\\Http\\Server\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "PHP-FIG",
-                    "homepage": "https://www.php-fig.org/"
-                }
-            ],
-            "description": "Common interface for HTTP server-side request handler",
-            "keywords": [
-                "handler",
-                "http",
-                "http-interop",
-                "psr",
-                "psr-15",
-                "psr-7",
-                "request",
-                "response",
-                "server"
-            ],
-            "support": {
-                "source": "https://github.com/php-fig/http-server-handler/tree/1.0.2"
-            },
-            "time": "2023-04-10T20:06:20+00:00"
-        },
-        {
-            "name": "psr/http-server-middleware",
-            "version": "1.0.2",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/php-fig/http-server-middleware.git",
-                "reference": "c1481f747daaa6a0782775cd6a8c26a1bf4a3829"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/php-fig/http-server-middleware/zipball/c1481f747daaa6a0782775cd6a8c26a1bf4a3829",
-                "reference": "c1481f747daaa6a0782775cd6a8c26a1bf4a3829",
-                "shasum": ""
-            },
-            "require": {
-                "php": ">=7.0",
-                "psr/http-message": "^1.0 || ^2.0",
-                "psr/http-server-handler": "^1.0"
-            },
-            "type": "library",
-            "extra": {
-                "branch-alias": {
-                    "dev-master": "1.0.x-dev"
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Psr\\Http\\Server\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "PHP-FIG",
-                    "homepage": "https://www.php-fig.org/"
-                }
-            ],
-            "description": "Common interface for HTTP server-side middleware",
-            "keywords": [
-                "http",
-                "http-interop",
-                "middleware",
-                "psr",
-                "psr-15",
-                "psr-7",
-                "request",
-                "response"
-            ],
-            "support": {
-                "issues": "https://github.com/php-fig/http-server-middleware/issues",
-                "source": "https://github.com/php-fig/http-server-middleware/tree/1.0.2"
-            },
-            "time": "2023-04-11T06:14:47+00:00"
-        },
-        {
-            "name": "psr/log",
-            "version": "3.0.2",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/php-fig/log.git",
-                "reference": "f16e1d5863e37f8d8c2a01719f5b34baa2b714d3"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/php-fig/log/zipball/f16e1d5863e37f8d8c2a01719f5b34baa2b714d3",
-                "reference": "f16e1d5863e37f8d8c2a01719f5b34baa2b714d3",
-                "shasum": ""
-            },
-            "require": {
-                "php": ">=8.0.0"
-            },
-            "type": "library",
-            "extra": {
-                "branch-alias": {
-                    "dev-master": "3.x-dev"
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Psr\\Log\\": "src"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "PHP-FIG",
-                    "homepage": "https://www.php-fig.org/"
-                }
-            ],
-            "description": "Common interface for logging libraries",
-            "homepage": "https://github.com/php-fig/log",
-            "keywords": [
-                "log",
-                "psr",
-                "psr-3"
-            ],
-            "support": {
-                "source": "https://github.com/php-fig/log/tree/3.0.2"
-            },
-            "time": "2024-09-11T13:17:53+00:00"
-        },
-        {
-            "name": "ralouphie/getallheaders",
-            "version": "3.0.3",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/ralouphie/getallheaders.git",
-                "reference": "120b605dfeb996808c31b6477290a714d356e822"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/ralouphie/getallheaders/zipball/120b605dfeb996808c31b6477290a714d356e822",
-                "reference": "120b605dfeb996808c31b6477290a714d356e822",
-                "shasum": ""
-            },
-            "require": {
-                "php": ">=5.6"
-            },
-            "require-dev": {
-                "php-coveralls/php-coveralls": "^2.1",
-                "phpunit/phpunit": "^5 || ^6.5"
-            },
-            "type": "library",
-            "autoload": {
-                "files": [
-                    "src/getallheaders.php"
-                ]
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Ralph Khattar",
-                    "email": "ralph.khattar@gmail.com"
-                }
-            ],
-            "description": "A polyfill for getallheaders.",
-            "support": {
-                "issues": "https://github.com/ralouphie/getallheaders/issues",
-                "source": "https://github.com/ralouphie/getallheaders/tree/develop"
-            },
-            "time": "2019-03-08T08:55:37+00:00"
-        },
-        {
-            "name": "slim/psr7",
-            "version": "1.7.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/slimphp/Slim-Psr7.git",
-                "reference": "753e9646def5ff4db1a06e5cf4ef539bfd30f467"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/slimphp/Slim-Psr7/zipball/753e9646def5ff4db1a06e5cf4ef539bfd30f467",
-                "reference": "753e9646def5ff4db1a06e5cf4ef539bfd30f467",
-                "shasum": ""
-            },
-            "require": {
-                "fig/http-message-util": "^1.1.5",
-                "php": "^8.0",
-                "psr/http-factory": "^1.1",
-                "psr/http-message": "^1.0 || ^2.0",
-                "ralouphie/getallheaders": "^3.0",
-                "symfony/polyfill-php80": "^1.29"
-            },
-            "provide": {
-                "psr/http-factory-implementation": "^1.0",
-                "psr/http-message-implementation": "^1.0 || ^2.0"
-            },
-            "require-dev": {
-                "adriansuter/php-autoload-override": "^1.4",
-                "ext-json": "*",
-                "http-interop/http-factory-tests": "^1.1.0",
-                "php-http/psr7-integration-tests": "1.3.0",
-                "phpspec/prophecy": "^1.19",
-                "phpspec/prophecy-phpunit": "^2.2",
-                "phpstan/phpstan": "^1.11",
-                "phpunit/phpunit": "^9.6",
-                "squizlabs/php_codesniffer": "^3.10"
-            },
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "Slim\\Psr7\\": "src"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Josh Lockhart",
-                    "email": "hello@joshlockhart.com",
-                    "homepage": "http://joshlockhart.com"
-                },
-                {
-                    "name": "Andrew Smith",
-                    "email": "a.smith@silentworks.co.uk",
-                    "homepage": "http://silentworks.co.uk"
-                },
-                {
-                    "name": "Rob Allen",
-                    "email": "rob@akrabat.com",
-                    "homepage": "http://akrabat.com"
-                },
-                {
-                    "name": "Pierre Berube",
-                    "email": "pierre@lgse.com",
-                    "homepage": "http://www.lgse.com"
-                }
-            ],
-            "description": "Strict PSR-7 implementation",
-            "homepage": "https://www.slimframework.com",
-            "keywords": [
-                "http",
-                "psr-7",
-                "psr7"
-            ],
-            "support": {
-                "issues": "https://github.com/slimphp/Slim-Psr7/issues",
-                "source": "https://github.com/slimphp/Slim-Psr7/tree/1.7.0"
-            },
-            "time": "2024-06-08T14:48:17+00:00"
-        },
-        {
-            "name": "slim/slim",
-            "version": "4.14.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/slimphp/Slim.git",
-                "reference": "5943393b88716eb9e82c4161caa956af63423913"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/slimphp/Slim/zipball/5943393b88716eb9e82c4161caa956af63423913",
-                "reference": "5943393b88716eb9e82c4161caa956af63423913",
-                "shasum": ""
-            },
-            "require": {
-                "ext-json": "*",
-                "nikic/fast-route": "^1.3",
-                "php": "^7.4 || ^8.0",
-                "psr/container": "^1.0 || ^2.0",
-                "psr/http-factory": "^1.1",
-                "psr/http-message": "^1.1 || ^2.0",
-                "psr/http-server-handler": "^1.0",
-                "psr/http-server-middleware": "^1.0",
-                "psr/log": "^1.1 || ^2.0 || ^3.0"
-            },
-            "require-dev": {
-                "adriansuter/php-autoload-override": "^1.4",
-                "ext-simplexml": "*",
-                "guzzlehttp/psr7": "^2.6",
-                "httpsoft/http-message": "^1.1",
-                "httpsoft/http-server-request": "^1.1",
-                "laminas/laminas-diactoros": "^2.17 || ^3",
-                "nyholm/psr7": "^1.8",
-                "nyholm/psr7-server": "^1.1",
-                "phpspec/prophecy": "^1.19",
-                "phpspec/prophecy-phpunit": "^2.1",
-                "phpstan/phpstan": "^1.11",
-                "phpunit/phpunit": "^9.6",
-                "slim/http": "^1.3",
-                "slim/psr7": "^1.6",
-                "squizlabs/php_codesniffer": "^3.10",
-                "vimeo/psalm": "^5.24"
-            },
-            "suggest": {
-                "ext-simplexml": "Needed to support XML format in BodyParsingMiddleware",
-                "ext-xml": "Needed to support XML format in BodyParsingMiddleware",
-                "php-di/php-di": "PHP-DI is the recommended container library to be used with Slim",
-                "slim/psr7": "Slim PSR-7 implementation. See https://www.slimframework.com/docs/v4/start/installation.html for more information."
-            },
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "Slim\\": "Slim"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Josh Lockhart",
-                    "email": "hello@joshlockhart.com",
-                    "homepage": "https://joshlockhart.com"
-                },
-                {
-                    "name": "Andrew Smith",
-                    "email": "a.smith@silentworks.co.uk",
-                    "homepage": "http://silentworks.co.uk"
-                },
-                {
-                    "name": "Rob Allen",
-                    "email": "rob@akrabat.com",
-                    "homepage": "http://akrabat.com"
-                },
-                {
-                    "name": "Pierre Berube",
-                    "email": "pierre@lgse.com",
-                    "homepage": "http://www.lgse.com"
-                },
-                {
-                    "name": "Gabriel Manricks",
-                    "email": "gmanricks@me.com",
-                    "homepage": "http://gabrielmanricks.com"
-                }
-            ],
-            "description": "Slim is a PHP micro framework that helps you quickly write simple yet powerful web applications and APIs",
-            "homepage": "https://www.slimframework.com",
-            "keywords": [
-                "api",
-                "framework",
-                "micro",
-                "router"
-            ],
-            "support": {
-                "docs": "https://www.slimframework.com/docs/v4/",
-                "forum": "https://discourse.slimframework.com/",
-                "irc": "irc://irc.freenode.net:6667/slimphp",
-                "issues": "https://github.com/slimphp/Slim/issues",
-                "rss": "https://www.slimframework.com/blog/feed.rss",
-                "slack": "https://slimphp.slack.com/",
-                "source": "https://github.com/slimphp/Slim",
-                "wiki": "https://github.com/slimphp/Slim/wiki"
-            },
-            "funding": [
-                {
-                    "url": "https://opencollective.com/slimphp",
-                    "type": "open_collective"
-                },
-                {
-                    "url": "https://tidelift.com/funding/github/packagist/slim/slim",
-                    "type": "tidelift"
-                }
-            ],
-            "time": "2024-06-13T08:54:48+00:00"
-        },
-        {
-            "name": "symfony/polyfill-ctype",
-            "version": "v1.31.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/symfony/polyfill-ctype.git",
-                "reference": "a3cc8b044a6ea513310cbd48ef7333b384945638"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/symfony/polyfill-ctype/zipball/a3cc8b044a6ea513310cbd48ef7333b384945638",
-                "reference": "a3cc8b044a6ea513310cbd48ef7333b384945638",
-                "shasum": ""
-            },
-            "require": {
-                "php": ">=7.2"
-            },
-            "provide": {
-                "ext-ctype": "*"
-            },
-            "suggest": {
-                "ext-ctype": "For best performance"
-            },
-            "type": "library",
-            "extra": {
-                "thanks": {
-                    "name": "symfony/polyfill",
-                    "url": "https://github.com/symfony/polyfill"
-                }
-            },
-            "autoload": {
-                "files": [
-                    "bootstrap.php"
-                ],
-                "psr-4": {
-                    "Symfony\\Polyfill\\Ctype\\": ""
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Gert de Pagter",
-                    "email": "BackEndTea@gmail.com"
-                },
-                {
-                    "name": "Symfony Community",
-                    "homepage": "https://symfony.com/contributors"
-                }
-            ],
-            "description": "Symfony polyfill for ctype functions",
-            "homepage": "https://symfony.com",
-            "keywords": [
-                "compatibility",
-                "ctype",
-                "polyfill",
-                "portable"
-            ],
-            "support": {
-                "source": "https://github.com/symfony/polyfill-ctype/tree/v1.31.0"
-            },
-            "funding": [
-                {
-                    "url": "https://symfony.com/sponsor",
-                    "type": "custom"
-                },
-                {
-                    "url": "https://github.com/fabpot",
-                    "type": "github"
-                },
-                {
-                    "url": "https://tidelift.com/funding/github/packagist/symfony/symfony",
-                    "type": "tidelift"
-                }
-            ],
-            "time": "2024-09-09T11:45:10+00:00"
-        },
-        {
-            "name": "symfony/polyfill-mbstring",
-            "version": "v1.31.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/symfony/polyfill-mbstring.git",
-                "reference": "85181ba99b2345b0ef10ce42ecac37612d9fd341"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/symfony/polyfill-mbstring/zipball/85181ba99b2345b0ef10ce42ecac37612d9fd341",
-                "reference": "85181ba99b2345b0ef10ce42ecac37612d9fd341",
-                "shasum": ""
-            },
-            "require": {
-                "php": ">=7.2"
-            },
-            "provide": {
-                "ext-mbstring": "*"
-            },
-            "suggest": {
-                "ext-mbstring": "For best performance"
-            },
-            "type": "library",
-            "extra": {
-                "thanks": {
-                    "name": "symfony/polyfill",
-                    "url": "https://github.com/symfony/polyfill"
-                }
-            },
-            "autoload": {
-                "files": [
-                    "bootstrap.php"
-                ],
-                "psr-4": {
-                    "Symfony\\Polyfill\\Mbstring\\": ""
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Nicolas Grekas",
-                    "email": "p@tchwork.com"
-                },
-                {
-                    "name": "Symfony Community",
-                    "homepage": "https://symfony.com/contributors"
-                }
-            ],
-            "description": "Symfony polyfill for the Mbstring extension",
-            "homepage": "https://symfony.com",
-            "keywords": [
-                "compatibility",
-                "mbstring",
-                "polyfill",
-                "portable",
-                "shim"
-            ],
-            "support": {
-                "source": "https://github.com/symfony/polyfill-mbstring/tree/v1.31.0"
-            },
-            "funding": [
-                {
-                    "url": "https://symfony.com/sponsor",
-                    "type": "custom"
-                },
-                {
-                    "url": "https://github.com/fabpot",
-                    "type": "github"
-                },
-                {
-                    "url": "https://tidelift.com/funding/github/packagist/symfony/symfony",
-                    "type": "tidelift"
-                }
-            ],
-            "time": "2024-09-09T11:45:10+00:00"
-        },
-        {
-            "name": "symfony/polyfill-php80",
-            "version": "v1.31.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/symfony/polyfill-php80.git",
-                "reference": "60328e362d4c2c802a54fcbf04f9d3fb892b4cf8"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/symfony/polyfill-php80/zipball/60328e362d4c2c802a54fcbf04f9d3fb892b4cf8",
-                "reference": "60328e362d4c2c802a54fcbf04f9d3fb892b4cf8",
-                "shasum": ""
-            },
-            "require": {
-                "php": ">=7.2"
-            },
-            "type": "library",
-            "extra": {
-                "thanks": {
-                    "name": "symfony/polyfill",
-                    "url": "https://github.com/symfony/polyfill"
-                }
-            },
-            "autoload": {
-                "files": [
-                    "bootstrap.php"
-                ],
-                "psr-4": {
-                    "Symfony\\Polyfill\\Php80\\": ""
-                },
-                "classmap": [
-                    "Resources/stubs"
-                ]
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Ion Bazan",
-                    "email": "ion.bazan@gmail.com"
-                },
-                {
-                    "name": "Nicolas Grekas",
-                    "email": "p@tchwork.com"
-                },
-                {
-                    "name": "Symfony Community",
-                    "homepage": "https://symfony.com/contributors"
-                }
-            ],
-            "description": "Symfony polyfill backporting some PHP 8.0+ features to lower PHP versions",
-            "homepage": "https://symfony.com",
-            "keywords": [
-                "compatibility",
-                "polyfill",
-                "portable",
-                "shim"
-            ],
-            "support": {
-                "source": "https://github.com/symfony/polyfill-php80/tree/v1.31.0"
-            },
-            "funding": [
-                {
-                    "url": "https://symfony.com/sponsor",
-                    "type": "custom"
-                },
-                {
-                    "url": "https://github.com/fabpot",
-                    "type": "github"
-                },
-                {
-                    "url": "https://tidelift.com/funding/github/packagist/symfony/symfony",
-                    "type": "tidelift"
-                }
-            ],
-            "time": "2024-09-09T11:45:10+00:00"
-        },
-        {
-            "name": "vlucas/phpdotenv",
-            "version": "v5.6.1",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/vlucas/phpdotenv.git",
-                "reference": "a59a13791077fe3d44f90e7133eb68e7d22eaff2"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/vlucas/phpdotenv/zipball/a59a13791077fe3d44f90e7133eb68e7d22eaff2",
-                "reference": "a59a13791077fe3d44f90e7133eb68e7d22eaff2",
-                "shasum": ""
-            },
-            "require": {
-                "ext-pcre": "*",
-                "graham-campbell/result-type": "^1.1.3",
-                "php": "^7.2.5 || ^8.0",
-                "phpoption/phpoption": "^1.9.3",
-                "symfony/polyfill-ctype": "^1.24",
-                "symfony/polyfill-mbstring": "^1.24",
-                "symfony/polyfill-php80": "^1.24"
-            },
-            "require-dev": {
-                "bamarni/composer-bin-plugin": "^1.8.2",
-                "ext-filter": "*",
-                "phpunit/phpunit": "^8.5.34 || ^9.6.13 || ^10.4.2"
-            },
-            "suggest": {
-                "ext-filter": "Required to use the boolean validator."
-            },
-            "type": "library",
-            "extra": {
-                "bamarni-bin": {
-                    "bin-links": true,
-                    "forward-command": false
-                },
-                "branch-alias": {
-                    "dev-master": "5.6-dev"
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Dotenv\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "BSD-3-Clause"
-            ],
-            "authors": [
-                {
-                    "name": "Graham Campbell",
-                    "email": "hello@gjcampbell.co.uk",
-                    "homepage": "https://github.com/GrahamCampbell"
-                },
-                {
-                    "name": "Vance Lucas",
-                    "email": "vance@vancelucas.com",
-                    "homepage": "https://github.com/vlucas"
-                }
-            ],
-            "description": "Loads environment variables from `.env` to `getenv()`, `$_ENV` and `$_SERVER` automagically.",
-            "keywords": [
-                "dotenv",
-                "env",
-                "environment"
-            ],
-            "support": {
-                "issues": "https://github.com/vlucas/phpdotenv/issues",
-                "source": "https://github.com/vlucas/phpdotenv/tree/v5.6.1"
-            },
-            "funding": [
-                {
-                    "url": "https://github.com/GrahamCampbell",
-                    "type": "github"
-                },
-                {
-                    "url": "https://tidelift.com/funding/github/packagist/vlucas/phpdotenv",
-                    "type": "tidelift"
-                }
-            ],
-            "time": "2024-07-20T21:52:34+00:00"
-        }
-    ],
-    "packages-dev": [],
-    "aliases": [],
-    "minimum-stability": "stable",
-    "stability-flags": {},
-    "prefer-stable": false,
-    "prefer-lowest": false,
-    "platform": {
-        "php": "^8.1"
-    },
-    "platform-dev": {},
-    "plugin-api-version": "2.6.0"
-}
 === ./backend/.env.example ===
 DB_HOST=localhost
 DB_PORT=3306
@@ -5707,7 +5179,6 @@ APP_KEY=base64:your-secret-key-here
 
 # If you're using JWT for authentication
 JWT_SECRET=your-jwt-secret-key-here
-=== ./pawpath_contents.txt ===
 === ./.gitignore ===
 # Dependencies
 /frontend/node_modules
@@ -5757,7 +5228,6 @@ Thumbs.db
 # Database
 *.sqlite
 *.sqlite3
-=== ./frontend/index.html ===
 === ./README.md ===
 # PawPath - Pet Adoption Database and Community Platform
 
