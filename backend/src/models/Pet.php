@@ -9,6 +9,18 @@ class Pet {
     private PDO $db;
     private static array $validSpecies = ['Dog', 'Cat', 'Bird', 'Rabbit', 'Other'];
 
+    private function formatTraits(array $traits): array {
+        $formatted = [];
+        foreach ($traits as $trait) {
+            $category = $trait['category'] ?? 'General';
+            if (!isset($formatted[$category])) {
+                $formatted[$category] = [];
+            }
+            $formatted[$category][] = $trait['trait_name'];
+        }
+        return $formatted;
+    }
+
     private function validatePetData(array $data): void {
         $requiredFields = ['name', 'species', 'shelter_id'];
         foreach ($requiredFields as $field) {
@@ -69,18 +81,18 @@ class Pet {
             $stmt = $this->db->prepare($query);
             $stmt->execute($params);
             $pets = $stmt->fetchAll();
-
-            // Get traits for each pet
-            foreach ($pets as &$pet) {
-                $stmt = $this->db->prepare("
-                    SELECT t.trait_id, t.trait_name, tc.name as category_name
-                    FROM Pet_Trait_Relation ptr
-                    JOIN Pet_Trait t ON ptr.trait_id = t.trait_id
-                    LEFT JOIN Trait_Category tc ON t.category_id = tc.category_id
-                    WHERE ptr.pet_id = ?
-                ");
-                $stmt->execute([$pet['pet_id']]);
-                $pet['traits'] = $stmt->fetchAll();
+        
+        foreach ($pets as &$pet) {
+            $stmt = $this->db->prepare("
+                SELECT t.trait_id, t.trait_name, tc.name as category
+                FROM Pet_Trait_Relation ptr
+                JOIN Pet_Trait t ON ptr.trait_id = t.trait_id
+                LEFT JOIN Trait_Category tc ON t.category_id = tc.category_id
+                WHERE ptr.pet_id = ?
+            ");
+            $stmt->execute([$pet['pet_id']]);
+            $traits = $stmt->fetchAll();
+            $pet['traits'] = $this->formatTraits($traits);
             }
             
             return $pets;
@@ -89,7 +101,7 @@ class Pet {
             throw $e;
         }
     }
-    
+
     public function findById(int $id): ?array {
         try {
             $stmt = $this->db->prepare("
@@ -98,6 +110,7 @@ class Pet {
                 LEFT JOIN Shelter s ON p.shelter_id = s.shelter_id
                 WHERE p.pet_id = ?
             ");
+            
             $stmt->execute([$id]);
             $pet = $stmt->fetch();
             
@@ -107,15 +120,16 @@ class Pet {
             
             // Get pet traits with categories
             $stmt = $this->db->prepare("
-                SELECT t.trait_id, t.trait_name, t.value_type, t.possible_values,
-                       tc.name as category_name, tc.description as category_description
+                SELECT t.trait_id, t.trait_name, tc.name as category
                 FROM Pet_Trait_Relation ptr
                 JOIN Pet_Trait t ON ptr.trait_id = t.trait_id
                 LEFT JOIN Trait_Category tc ON t.category_id = tc.category_id
                 WHERE ptr.pet_id = ?
             ");
             $stmt->execute([$id]);
-            $pet['traits'] = $stmt->fetchAll();
+            $traits = $stmt->fetchAll();
+            
+            $pet['traits'] = $this->formatTraits($traits);
             
             return $pet;
         } catch (PDOException $e) {

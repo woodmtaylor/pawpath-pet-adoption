@@ -6,6 +6,7 @@ namespace PawPath\api;
 use PawPath\services\PetService;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
+use PawPath\utils\ResponseHelper;
 
 class PetController {
     private PetService $petService;
@@ -57,21 +58,14 @@ class PetController {
         }
     }
        
+
     public function getPet(Request $request, Response $response, array $args): Response {
         try {
             $petId = (int) $args['id'];
             $result = $this->petService->getPet($petId);
-            
-            $response->getBody()->write(json_encode($result));
-            return $response->withHeader('Content-Type', 'application/json');
+            return ResponseHelper::sendResponse($response, $result);
         } catch (\Exception $e) {
-            error_log('Error getting pet: ' . $e->getMessage());
-            
-            $response->getBody()->write(json_encode([
-                'error' => $e->getMessage()
-            ]));
-            return $response->withHeader('Content-Type', 'application/json')
-                           ->withStatus(404);
+            return ResponseHelper::sendError($response, $e->getMessage(), 404);
         }
     }
     
@@ -85,7 +79,6 @@ class PetController {
             foreach ($validFilters as $filter) {
                 if (isset($queryParams[$filter])) {
                     if ($filter === 'traits') {
-                        // Handle array of traits
                         $filters[$filter] = explode(',', $queryParams[$filter]);
                     } else {
                         $filters[$filter] = $queryParams[$filter];
@@ -94,17 +87,9 @@ class PetController {
             }
             
             $result = $this->petService->listPets($filters);
-            
-            $response->getBody()->write(json_encode($result));
-            return $response->withHeader('Content-Type', 'application/json');
+            return ResponseHelper::sendResponse($response, $result);
         } catch (\Exception $e) {
-            error_log('Error listing pets: ' . $e->getMessage());
-            
-            $response->getBody()->write(json_encode([
-                'error' => $e->getMessage()
-            ]));
-            return $response->withHeader('Content-Type', 'application/json')
-                           ->withStatus(400);
+            return ResponseHelper::sendError($response, $e->getMessage(), 400);
         }
     }
     

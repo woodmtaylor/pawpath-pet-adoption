@@ -14,6 +14,7 @@ use PawPath\api\AdoptionController;
 use PawPath\middleware\AuthMiddleware;
 use PawPath\api\BlogController;
 use PawPath\api\ProductController;
+use PawPath\api\UserProfileController;
 
 require __DIR__ . '/../vendor/autoload.php';
 
@@ -41,8 +42,36 @@ $app->post('/api/auth/login', function ($request, $response) {
     return $controller->login($request, $response);
 });
 
+// Email verification routes
+$app->post('/api/auth/verify-email', function ($request, $response) {
+    $controller = new AuthController();
+    return $controller->verifyEmail($request, $response);
+});
+
+$app->post('/api/auth/resend-verification', function ($request, $response) {
+    $controller = new AuthController();
+    return $controller->resendVerification($request, $response);
+})->add(new AuthMiddleware());
+
 // Protected routes group
 $app->group('/api', function ($group) {
+
+    $group->get('/auth/me', function ($request, $response) {
+        $controller = new AuthController();
+        return $controller->getCurrentUser($request, $response);
+    });
+
+    // User Profile routes
+    $group->get('/profile', function ($request, $response) {
+        $controller = new UserProfileController();
+        return $controller->getProfile($request, $response);
+    });
+
+    $group->put('/profile', function ($request, $response) {
+        $controller = new UserProfileController();
+        return $controller->updateProfile($request, $response);
+    });
+
     // Quiz routes
     $group->get('/quiz/start', function ($request, $response) {
         $controller = new QuizController();

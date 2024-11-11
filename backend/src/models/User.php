@@ -88,4 +88,86 @@ class User {
             throw $e;
         }
     }
+
+    public function updateRole(int $userId, string $role): bool {
+        try {
+            $stmt = $this->db->prepare("
+                UPDATE User 
+                SET role = ? 
+                WHERE user_id = ?
+            ");
+            
+            return $stmt->execute([$role, $userId]);
+        } catch (PDOException $e) {
+            error_log("Error updating user role: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    public function verifyEmail(int $userId): bool {
+        try {
+            $stmt = $this->db->prepare("
+                UPDATE User 
+                SET email_verified_at = CURRENT_TIMESTAMP,
+                    email_verification_token = NULL,
+                    account_status = 'active'
+                WHERE user_id = ?
+            ");
+            
+            return $stmt->execute([$userId]);
+        } catch (PDOException $e) {
+            error_log("Error verifying email: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    public function updateAccountStatus(int $userId, string $status): bool {
+        try {
+            $stmt = $this->db->prepare("
+                UPDATE User 
+                SET account_status = ? 
+                WHERE user_id = ?
+            ");
+            
+            return $stmt->execute([$status, $userId]);
+        } catch (PDOException $e) {
+            error_log("Error updating account status: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    public function createEmailVerificationToken(int $userId): string {
+        try {
+            $token = bin2hex(random_bytes(32));
+            $expires = date('Y-m-d H:i:s', strtotime('+24 hours'));
+            
+            $stmt = $this->db->prepare("
+                UPDATE User 
+                SET email_verification_token = ?,
+                    email_token_expires_at = ?
+                WHERE user_id = ?
+            ");
+            
+            $stmt->execute([$token, $expires, $userId]);
+            return $token;
+        } catch (PDOException $e) {
+            error_log("Error creating email verification token: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    public function updateLastLogin(int $userId): bool {
+        try {
+            $stmt = $this->db->prepare("
+                UPDATE User 
+                SET last_login = CURRENT_TIMESTAMP 
+                WHERE user_id = ?
+            ");
+            
+            return $stmt->execute([$userId]);
+        } catch (PDOException $e) {
+            error_log("Error updating last login: " . $e->getMessage());
+            throw $e;
+        }
+    }
 }
