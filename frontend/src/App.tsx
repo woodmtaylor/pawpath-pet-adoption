@@ -7,6 +7,8 @@ import LoginPage from './pages/LoginPage';
 import PetsPage from './pages/PetsPage';
 import QuizPage from './pages/QuizPage';
 import QuizResultsPage from './pages/QuizResultsPage';
+import RegisterPage from './pages/RegisterPage';
+import PetDetailPage from './pages/PetDetailPage';
 
 function App() {
   return (
@@ -17,7 +19,9 @@ function App() {
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
             <Route path="/pets" element={<PetsPage />} />
+            <Route path="/pets/:id" element={<PetDetailPage />} />
             <Route 
               path="/quiz" 
               element={

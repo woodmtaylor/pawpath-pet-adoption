@@ -17,32 +17,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useAtom(userAtom);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Check authentication status when the app loads
   useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      try {
-        const response = await api.get('/auth/me');
-        setUser(response.data.user);
-      } catch (error) {
-        localStorage.removeItem('token');
-        setUser(null);
+    const initializeAuth = async () => {
+      const token = localStorage.getItem('token');
+      
+      if (token) {
+        try {
+          // Set the token in axios headers
+          api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+          
+          // Fetch current user data
+          const response = await api.get('/auth/me');
+          setUser(response.data.user);
+        } catch (error) {
+          // If there's an error (invalid/expired token), clear everything
+          console.error('Auth initialization error:', error);
+          localStorage.removeItem('token');
+          delete api.defaults.headers.common['Authorization'];
+          setUser(null);
+        }
       }
-    }
-    setIsLoading(false);
-  };
+      
+      setIsLoading(false);
+    };
+
+    initializeAuth();
+  }, [setUser]);
 
   const login = async (email: string, password: string) => {
-    const response = await api.post('/auth/login', { email, password });
-    localStorage.setItem('token', response.data.token);
-    setUser(response.data.user);
+    try {
+      const response = await api.post('/auth/login', { email, password });
+      const { token, user } = response.data;
+      
+      // Save token and set axios default header
+      localStorage.setItem('token', token);
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      
+      setUser(user);
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    }
   };
 
   const logout = () => {
+    // Clear token and user data
     localStorage.removeItem('token');
+    delete api.defaults.headers.common['Authorization'];
     setUser(null);
   };
 
