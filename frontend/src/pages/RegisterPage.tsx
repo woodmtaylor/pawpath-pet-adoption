@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
+import { ApiResponse } from '@/types/api';
 
 const registerSchema = z.object({
   username: z.string()
@@ -50,43 +51,46 @@ function RegisterPage() {
   });
 
   const onSubmit = async (data: RegisterFormData) => {
-    try {
-      setIsLoading(true);
-      
-      const response = await api.post('/auth/register', {
-        username: data.username,
-        email: data.email,
-        password: data.password,
-      });
-      
-      // Save token
-      localStorage.setItem('token', response.data.token);
-      
-      // Update user state
-      setUser(response.data.user);
-      
-      // Show success toast
-      toast({
-        title: "Registration successful!",
-        description: "Welcome to PawPath! Let's find your perfect pet companion.",
-      });
-      
-      // Navigate to quiz or home page
-      navigate('/quiz');
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.error || 'Registration failed. Please try again.';
-      form.setError('root', { 
-        message: errorMessage 
-      });
-      
-      toast({
-        variant: "destructive",
-        title: "Registration failed",
-        description: errorMessage,
-      });
-    } finally {
-      setIsLoading(false);
-    }
+      try {
+          setIsLoading(true);
+          
+          const response = await api.post<ApiResponse<{ user: any; token: string }>>('/auth/register', {
+              username: data.username,
+              email: data.email,
+              password: data.password,
+          });
+          
+          // Check if response.data.data exists (new format) or fall back to response.data (old format)
+          const authData = response.data.data || response.data;
+          
+          // Save token
+          localStorage.setItem('token', authData.token);
+          
+          // Update user state
+          setUser(authData.user);
+          
+          // Show success toast
+          toast({
+              title: "Registration successful!",
+              description: "Welcome to PawPath! Let's find your perfect pet companion.",
+          });
+          
+          // Navigate to quiz or home page
+          navigate('/quiz');
+      } catch (err: any) {
+          const errorMessage = err.response?.data?.error || 'Registration failed. Please try again.';
+          form.setError('root', { 
+              message: errorMessage 
+          });
+          
+          toast({
+              variant: "destructive",
+              title: "Registration failed",
+              description: errorMessage,
+          });
+      } finally {
+          setIsLoading(false);
+      }
   };
 
   return (

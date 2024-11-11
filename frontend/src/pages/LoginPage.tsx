@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import api from '@/lib/axios';
+import { ApiResponse } from '@/types/api';
 
 // Form validation schema
 const loginSchema = z.object({
@@ -35,25 +36,29 @@ function LoginPage() {
   });
 
   const onSubmit = async (data: LoginFormData) => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      const response = await api.post('/auth/login', data);
-      
-      // Save token
-      localStorage.setItem('token', response.data.token);
-      
-      // Update user state
-      setUser(response.data.user);
-      
-      // Navigate to return URL
-      navigate(from, { replace: true });
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to login');
-    } finally {
-      setIsLoading(false);
-    }
+      try {
+          setIsLoading(true);
+          setError(null);
+          
+          const response = await api.post<ApiResponse<{ user: any; token: string }>>('/auth/login', data);
+          
+          // Check if response.data.data exists (new format) or fall back to response.data (old format)
+          const authData = response.data.data || response.data;
+          
+          // Save token
+          localStorage.setItem('token', authData.token);
+          
+          // Update user state
+          setUser(authData.user);
+          
+          // Navigate to return URL
+          navigate(from, { replace: true });
+      } catch (err: any) {
+          const errorMessage = err.response?.data?.error || 'Failed to login';
+          setError(errorMessage);
+      } finally {
+          setIsLoading(false);
+      }
   };
 
   return (

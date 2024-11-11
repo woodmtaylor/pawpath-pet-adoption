@@ -7,6 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Search, PawPrint, MapPin } from 'lucide-react';
 import api from '@/lib/axios';
+import { Pet, ApiResponse } from '@/types/api';
+import { useToast } from '@/hooks/use-toast';
 
 interface Pet {
   pet_id: number;
@@ -57,32 +59,31 @@ function PetsPage() {
 
   useEffect(() => {
     const fetchPets = async () => {
-      setLoading(true);
-      setError(null);
-
       try {
-        const params = new URLSearchParams();
-        if (searchTerm) params.set('search', searchTerm);
-        if (filters.species) params.set('species', filters.species);
-        if (filters.breed) params.set('breed', filters.breed);
-        if (filters.ageMin) params.set('age_min', filters.ageMin.toString());
-        if (filters.ageMax) params.set('age_max', filters.ageMax.toString());
-        if (filters.gender) params.set('gender', filters.gender);
-        if (filters.size) params.set('size', filters.size);
-        if (filters.goodWith?.length) params.set('good_with', filters.goodWith.join(','));
-        if (filters.traits?.length) params.set('traits', filters.traits.join(','));
+          setLoading(true);
+          setError(null);
+          
+          const params = Object.entries(filters)
+              .filter(([_, value]) => value !== '')
+              .reduce((acc, [key, value]) => ({
+                  ...acc,
+                  [key]: value
+              }), {});
 
-        setSearchParams(params);
-
-        const response = await api.get(`/pets?${params.toString()}`);
-        setPets(response.data);
+          const response = await api.get<ApiResponse<Pet[]>>('/pets', { params });
+          setPets(response.data.data || []);
       } catch (err: any) {
-        setError(err.response?.data?.error || 'Failed to fetch pets');
+          const errorMessage = err.response?.data?.error || 'Failed to fetch pets';
+          setError(errorMessage);
+          toast({
+              variant: "destructive",
+              title: "Error",
+              description: errorMessage,
+          });
       } finally {
-        setLoading(false);
+          setLoading(false);
       }
-    };
-
+  };
     const timeoutId = setTimeout(fetchPets, 300);
     return () => clearTimeout(timeoutId);
   }, [searchTerm, filters, setSearchParams]);
@@ -150,57 +151,36 @@ function PetsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {pets.map((pet) => (
-            <Card
-              key={pet.pet_id}
-              className="cursor-pointer hover:shadow-lg transition-shadow"
-              onClick={() => navigate(`/pets/${pet.pet_id}`)}
-            >
-              <div className="aspect-square relative bg-muted">
-                {pet.images?.[0] ? (
-                  <img
-                    src={pet.images[0]}
-                    alt={pet.name}
-                    className="object-cover w-full h-full"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <PawPrint className="h-12 w-12 text-muted-foreground" />
-                  </div>
-                )}
-              </div>
-              
-              <CardHeader>
-                <CardTitle>{pet.name}</CardTitle>
-                <CardDescription>
-                  {pet.breed} • {pet.age} years old • {pet.gender}
-                </CardDescription>
-              </CardHeader>
-
-              <CardContent>
-                <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
-                  {pet.description}
-                </p>
-
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {Array.isArray(pet.traits) ? (
-                    pet.traits.map((trait) => (
-                      <Badge
-                        key={trait}
-                        variant="secondary"
-                        className="text-xs"
-                      >
-                        {trait}
-                      </Badge>
-                    ))
-                  ) : null}
-                </div>
-
-                <div className="flex items-center text-sm text-muted-foreground">
-                  <MapPin className="h-4 w-4 mr-1" />
-                  {pet.shelter_name}
-                </div>
-              </CardContent>
-            </Card>
+              <Card key={pet.pet_id} className="overflow-hidden">
+                  <CardHeader>
+                      <CardTitle>{pet.name}</CardTitle>
+                      <CardDescription>
+                          {pet.breed} • {pet.gender} • {pet.age} years old
+                      </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                      <p className="text-muted-foreground mb-4">{pet.description}</p>
+                      
+                      {/* Traits */}
+                      {Object.entries(pet.traits || {}).map(([category, traits]) => (
+                          <div key={category} className="mb-2">
+                              <h4 className="text-sm font-medium text-muted-foreground">
+                                  {category}:
+                              </h4>
+                              <div className="flex flex-wrap gap-1">
+                                  {traits.map((trait) => (
+                                      <span
+                                          key={trait}
+                                          className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary"
+                                      >
+                                          {trait}
+                                      </span>
+                                  ))}
+                              </div>
+                          </div>
+                      ))}
+                  </CardContent>
+              </Card>
           ))}
         </div>
       )}

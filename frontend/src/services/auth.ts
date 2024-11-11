@@ -21,17 +21,17 @@ interface AuthResponse {
 }
 
 export const authService = {
-  async login(credentials: LoginCredentials) {
-    const response = await api.post<AuthResponse>('/auth/login', credentials)
-    return response.data
-  },
+    async login(credentials: LoginCredentials) {
+        const response = await api.post<ApiResponse<AuthResponse>>('/auth/login', credentials);
+        return response.data.data || response.data;
+    },
 
-  async register(credentials: RegisterCredentials) {
-    const response = await api.post<AuthResponse>('/auth/register', credentials)
-    return response.data
-  },
+    async register(credentials: RegisterCredentials) {
+        const response = await api.post<ApiResponse<AuthResponse>>('/auth/register', credentials);
+        return response.data.data || response.data;
+    },
 
-  async logout() {
-    localStorage.removeItem('token')
-  }
+    async logout() {
+        localStorage.removeItem('token');
+    }
 }
