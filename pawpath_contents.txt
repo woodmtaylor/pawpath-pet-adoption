@@ -61,6 +61,103 @@ class AuthMiddleware
         return null;
     }
 }
+=== ./backend/src/middleware/RoleMiddleware.php ===
+<?php
+namespace PawPath\middleware;
+
+use Psr\Http\Message\ServerRequestInterface as Request;
+use Psr\Http\Server\RequestHandlerInterface as RequestHandler;
+use Slim\Psr7\Response;
+use PawPath\config\Permissions;
+
+class RoleMiddleware
+{
+    private string $requiredRole;
+    
+    public function __construct(string $role)
+    {
+        $this->requiredRole = $role;
+    }
+    
+    public function __invoke(Request $request, RequestHandler $handler): Response
+    {
+        $user = $request->getAttribute('user');
+        
+        if (!$user || !isset($user['role'])) {
+            $response = new Response();
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'error' => 'Authentication required'
+            ]));
+            return $response->withStatus(401)
+                           ->withHeader('Content-Type', 'application/json');
+        }
+        
+        // Get role hierarchy from permissions config
+        $roleHierarchy = [
+            'admin' => ['admin', 'shelter_staff', 'adopter'],
+            'shelter_staff' => ['shelter_staff', 'adopter'],
+            'adopter' => ['adopter']
+        ];
+        
+        // Check if user's role has permission
+        if (!in_array($this->requiredRole, $roleHierarchy[$user['role']] ?? [])) {
+            $response = new Response();
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'error' => 'Insufficient permissions'
+            ]));
+            return $response->withStatus(403)
+                           ->withHeader('Content-Type', 'application/json');
+        }
+        
+        return $handler->handle($request);
+    }
+}
+=== ./backend/src/config/Permissions.php ===
+<?php
+namespace PawPath\config;
+
+class Permissions {
+    // User roles
+    public const ROLE_ADMIN = 'admin';
+    public const ROLE_SHELTER_STAFF = 'shelter_staff';
+    public const ROLE_ADOPTER = 'adopter';
+    
+    // Permission sets by role
+    public const PERMISSIONS = [
+        self::ROLE_ADMIN => [
+            'users:manage',
+            'shelters:manage',
+            'pets:manage',
+            'applications:manage',
+            'blog:manage',
+            'products:manage'
+        ],
+        self::ROLE_SHELTER_STAFF => [
+            'pets:create',
+            'pets:update',
+            'pets:delete',
+            'applications:view',
+            'applications:process'
+        ],
+        self::ROLE_ADOPTER => [
+            'pets:view',
+            'applications:create',
+            'applications:view-own',
+            'profile:manage-own'
+        ]
+    ];
+    
+    public static function hasPermission(string $role, string $permission): bool {
+        return isset(self::PERMISSIONS[$role]) && 
+               in_array($permission, self::PERMISSIONS[$role]);
+    }
+    
+    public static function validateRole(string $role): bool {
+        return in_array($role, [self::ROLE_ADMIN, self::ROLE_SHELTER_STAFF, self::ROLE_ADOPTER]);
+    }
+}
 === ./backend/src/config/email/EmailConfig.php ===
 <?php
 namespace PawPath\config\email;
@@ -3213,6 +3310,153 @@ class ShelterService {
     
     public function listShelters(array $filters = []): array {
         return $this->shelterModel->findAll($filters);
+    }
+}
+=== ./backend/src/services/UserRoleService.php ===
+<?php
+namespace PawPath\services;
+
+use PawPath\config\database\DatabaseConfig;
+use PawPath\models\User;
+use RuntimeException;
+use PDO;
+
+class UserRoleService {
+    private PDO $db;
+    private User $userModel;
+    
+    private const VALID_ROLES = ['adopter', 'shelter_staff', 'admin'];
+    private const ROLE_HIERARCHY = [
+        'admin' => ['admin', 'shelter_staff', 'adopter'],
+        'shelter_staff' => ['shelter_staff', 'adopter'],
+        'adopter' => ['adopter']
+    ];
+    
+    public function __construct() {
+        $this->db = DatabaseConfig::getConnection();
+        $this->userModel = new User();
+    }
+    
+    public function changeUserRole(int $userId, string $newRole, int $changedBy, string $reason = null): bool {
+        try {
+            // Start transaction
+            $this->db->beginTransaction();
+            
+            // Get user's current role
+            $user = $this->userModel->findById($userId);
+            if (!$user) {
+                throw new RuntimeException('User not found');
+            }
+            
+            // Get admin user making the change
+            $admin = $this->userModel->findById($changedBy);
+            if (!$admin) {
+                throw new RuntimeException('Admin user not found');
+            }
+            
+            // Validate role change permissions
+            if (!$this->canChangeRole($admin['role'], $user['role'], $newRole)) {
+                throw new RuntimeException('Insufficient permissions to change role');
+            }
+            
+            // Update user's role
+            $stmt = $this->db->prepare("
+                UPDATE User 
+                SET role = ? 
+                WHERE user_id = ?
+            ");
+            
+            $stmt->execute([$newRole, $userId]);
+            
+            // Log the role change
+            $stmt = $this->db->prepare("
+                INSERT INTO RoleChangeLog (
+                    user_id, old_role, new_role, 
+                    changed_by, reason
+                ) VALUES (?, ?, ?, ?, ?)
+            ");
+            
+            $stmt->execute([
+                $userId,
+                $user['role'],
+                $newRole,
+                $changedBy,
+                $reason
+            ]);
+            
+            // If changing to shelter staff, may need additional setup
+            if ($newRole === 'shelter_staff') {
+                // Handle shelter staff specific setup here
+                // e.g., default shelter assignment
+            }
+            
+            $this->db->commit();
+            return true;
+            
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+    
+    public function assignToShelter(int $userId, int $shelterId, string $position = 'staff'): bool {
+        try {
+            $this->db->beginTransaction();
+            
+            // Verify user is shelter_staff
+            $user = $this->userModel->findById($userId);
+            if ($user['role'] !== 'shelter_staff') {
+                throw new RuntimeException('User must be shelter staff');
+            }
+            
+            // Add shelter staff relationship
+            $stmt = $this->db->prepare("
+                INSERT INTO ShelterStaff (
+                    shelter_id, user_id, position
+                ) VALUES (?, ?, ?)
+                ON DUPLICATE KEY UPDATE position = ?
+            ");
+            
+            $stmt->execute([$shelterId, $userId, $position, $position]);
+            
+            $this->db->commit();
+            return true;
+            
+        } catch (\Exception $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+    
+    public function getUsersByRole(string $role): array {
+        $stmt = $this->db->prepare("
+            SELECT user_id, username, email, registration_date, account_status
+            FROM User 
+            WHERE role = ?
+            ORDER BY username
+        ");
+        
+        $stmt->execute([$role]);
+        return $stmt->fetchAll();
+    }
+    
+    private function canChangeRole(string $adminRole, string $currentRole, string $newRole): bool {
+        // Only admins can change roles
+        if ($adminRole !== 'admin') {
+            return false;
+        }
+        
+        // Validate role exists
+        if (!in_array($newRole, self::VALID_ROLES)) {
+            return false;
+        }
+        
+        // Special case: can't change own role or other admins
+        if ($currentRole === 'admin') {
+            return false;
+        }
+        
+        return true;
     }
 }
 === ./backend/src/services/AuthService.php ===
