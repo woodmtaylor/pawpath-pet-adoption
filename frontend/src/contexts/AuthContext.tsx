@@ -90,24 +90,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [setUser, setIsLoading]);
 
   const login = async (email: string, password: string) => {
-    try {
-      const response = await api.post('/auth/login', { email, password });
-      const { token, user } = response.data;
-      
-      // Store auth data
-      setStoredToken(token);
-      setStoredUser(user);
-      
-      // Set axios default header
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      
-      // Update state
-      setUser(user);
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error;
-    }
+      try {
+          const response = await api.post('/auth/login', { email, password });
+          const { token, user } = response.data.data;
+          
+          // Store token
+          setStoredToken(token);
+          
+          // Update axios default header
+          api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+          
+          // Store user
+          setStoredUser(user);
+          setUser(user);
+          
+          // Log for debugging
+          console.log('Login successful, token stored');
+      } catch (error) {
+          console.error('Login error:', error);
+          throw error;
+      }
   };
+
+  useEffect(() => {
+    const token = getStoredToken();
+    if (token) {
+        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        console.log('Token restored from storage');
+      }
+  }, []);
 
   const logout = () => {
     // Clear stored auth data

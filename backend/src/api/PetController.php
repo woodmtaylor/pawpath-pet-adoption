@@ -72,24 +72,37 @@ class PetController {
     public function listPets(Request $request, Response $response): Response {
         try {
             $queryParams = $request->getQueryParams();
-            $filters = [];
+            error_log("Received request params: " . print_r($queryParams, true));
             
-            // Handle search filters
-            $validFilters = ['species', 'breed', 'age_min', 'age_max', 'gender', 'shelter_id', 'traits'];
-            foreach ($validFilters as $filter) {
-                if (isset($queryParams[$filter])) {
-                    if ($filter === 'traits') {
-                        $filters[$filter] = explode(',', $queryParams[$filter]);
-                    } else {
-                        $filters[$filter] = $queryParams[$filter];
-                    }
-                }
-            }
+            $result = $this->petService->listPets($queryParams);
+            error_log("Query result: " . print_r($result, true));
             
-            $result = $this->petService->listPets($filters);
-            return ResponseHelper::sendResponse($response, $result);
+            $responseData = [
+                'success' => true,
+                'data' => [
+                    'items' => $result['pets'],
+                    'total' => $result['total'],
+                    'page' => (int)($queryParams['page'] ?? 1),
+                    'perPage' => (int)($queryParams['perPage'] ?? 12)
+                ]
+            ];
+            
+            error_log("Sending response: " . print_r($responseData, true));
+            
+            $response->getBody()->write(json_encode($responseData));
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withStatus(200);
+                
         } catch (\Exception $e) {
-            return ResponseHelper::sendError($response, $e->getMessage(), 400);
+            error_log("Error in listPets: " . $e->getMessage());
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'error' => $e->getMessage()
+            ]));
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withStatus(500);
         }
     }
     

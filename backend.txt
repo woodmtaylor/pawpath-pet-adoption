@@ -20,30 +20,43 @@ class AuthMiddleware
     
     public function __invoke(Request $request, RequestHandler $handler): Response
     {
+        error_log('Processing auth middleware');
+        
         $token = $this->extractToken($request);
         
         if (!$token) {
+            error_log('No token provided - returning 401');
             $response = new Response();
             $response->getBody()->write(json_encode([
+                'success' => false,
                 'error' => 'No token provided'
             ]));
-            return $response->withStatus(401)->withHeader('Content-Type', 'application/json');
+            return $response
+                ->withStatus(401)
+                ->withHeader('Content-Type', 'application/json');
         }
         
-        $payload = $this->authService->validateToken($token);
-        
-        if (!$payload) {
+        try {
+            $payload = $this->authService->validateToken($token);
+            if (!$payload) {
+                throw new \Exception('Invalid token');
+            }
+            
+            error_log('Token validated successfully for user: ' . ($payload['user_id'] ?? 'unknown'));
+            $request = $request->withAttribute('user_id', $payload['user_id']);
+            return $handler->handle($request);
+            
+        } catch (\Exception $e) {
+            error_log('Token validation failed: ' . $e->getMessage());
             $response = new Response();
             $response->getBody()->write(json_encode([
+                'success' => false,
                 'error' => 'Invalid token'
             ]));
-            return $response->withStatus(401)->withHeader('Content-Type', 'application/json');
+            return $response
+                ->withStatus(401)
+                ->withHeader('Content-Type', 'application/json');
         }
-        
-        // Add user to request attributes
-        $request = $request->withAttribute('user_id', $payload['user_id']);
-        
-        return $handler->handle($request);
     }
     
     private function extractToken(Request $request): ?string
@@ -51,13 +64,16 @@ class AuthMiddleware
         $header = $request->getHeaderLine('Authorization');
         
         if (empty($header)) {
+            error_log('No Authorization header found');
             return null;
         }
         
         if (preg_match('/Bearer\s+(.*)$/i', $header, $matches)) {
+            error_log('Token extracted: ' . substr($matches[1], 0, 10) . '...');
             return $matches[1];
         }
         
+        error_log('Invalid Authorization header format');
         return null;
     }
 }
@@ -326,24 +342,37 @@ class PetController {
     public function listPets(Request $request, Response $response): Response {
         try {
             $queryParams = $request->getQueryParams();
-            $filters = [];
+            error_log("Received request params: " . print_r($queryParams, true));
             
-            // Handle search filters
-            $validFilters = ['species', 'breed', 'age_min', 'age_max', 'gender', 'shelter_id', 'traits'];
-            foreach ($validFilters as $filter) {
-                if (isset($queryParams[$filter])) {
-                    if ($filter === 'traits') {
-                        $filters[$filter] = explode(',', $queryParams[$filter]);
-                    } else {
-                        $filters[$filter] = $queryParams[$filter];
-                    }
-                }
-            }
+            $result = $this->petService->listPets($queryParams);
+            error_log("Query result: " . print_r($result, true));
             
-            $result = $this->petService->listPets($filters);
-            return ResponseHelper::sendResponse($response, $result);
+            $responseData = [
+                'success' => true,
+                'data' => [
+                    'items' => $result['pets'],
+                    'total' => $result['total'],
+                    'page' => (int)($queryParams['page'] ?? 1),
+                    'perPage' => (int)($queryParams['perPage'] ?? 12)
+                ]
+            ];
+            
+            error_log("Sending response: " . print_r($responseData, true));
+            
+            $response->getBody()->write(json_encode($responseData));
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withStatus(200);
+                
         } catch (\Exception $e) {
-            return ResponseHelper::sendError($response, $e->getMessage(), 400);
+            error_log("Error in listPets: " . $e->getMessage());
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'error' => $e->getMessage()
+            ]));
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withStatus(500);
         }
     }
     
@@ -1372,10 +1401,17 @@ use Psr\Http\Message\ResponseInterface;
 
 class ResponseHelper {
     public static function sendResponse(ResponseInterface $response, $data, int $status = 200): ResponseInterface {
-        $response->getBody()->write(json_encode([
+        $body = json_encode([
             'success' => true,
             'data' => $data
-        ]));
+        ]);
+        
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            error_log("JSON encode error: " . json_last_error_msg());
+            return self::sendError($response, "Internal server error", 500);
+        }
+        
+        $response->getBody()->write($body);
         
         return $response
             ->withHeader('Content-Type', 'application/json')
@@ -1383,10 +1419,12 @@ class ResponseHelper {
     }
 
     public static function sendError(ResponseInterface $response, string $message, int $status = 400): ResponseInterface {
-        $response->getBody()->write(json_encode([
+        $body = json_encode([
             'success' => false,
             'error' => $message
-        ]));
+        ]);
+        
+        $response->getBody()->write($body);
         
         return $response
             ->withHeader('Content-Type', 'application/json')
@@ -3675,13 +3713,16 @@ use PawPath\models\Pet;
 use PawPath\models\PetTrait;
 use PawPath\models\Shelter;
 use RuntimeException;
+use PawPath\config\database\DatabaseConfig;
 
 class PetService {
+    private $db;
     private Pet $petModel;
     private PetTrait $traitModel;
     private Shelter $shelterModel;
     
     public function __construct() {
+        $this->db = DatabaseConfig::getConnection();
         $this->petModel = new Pet();
         $this->traitModel = new PetTrait();
         $this->shelterModel = new Shelter();
@@ -3763,6 +3804,20 @@ class PetService {
         $this->petModel->update($id, $data);
         return $this->petModel->findById($id);
     }
+
+    private function formatTraits(array $traits): array {
+        $formatted = [];
+        foreach ($traits as $trait) {
+            $category = $trait['category'] ?? 'General';
+            if (!isset($formatted[$category])) {
+                $formatted[$category] = [];
+            }
+            if (!in_array($trait['trait_name'], $formatted[$category])) {
+                $formatted[$category][] = $trait['trait_name'];
+            }
+        }
+        return $formatted;
+    }
     
     public function deletePet(int $id): bool {
         // Verify pet exists
@@ -3786,23 +3841,99 @@ class PetService {
     }
     
     public function listPets(array $filters = []): array {
-        // Validate filters
-        if (isset($filters['age_min']) && $filters['age_min'] < 0) {
-            throw new RuntimeException("Minimum age cannot be negative");
-        }
-        
-        if (isset($filters['age_max']) && $filters['age_max'] > 30) {
-            throw new RuntimeException("Maximum age cannot exceed 30");
-        }
-        
-        if (isset($filters['species'])) {
-            $validSpecies = ['Dog', 'Cat', 'Bird', 'Rabbit', 'Other'];
-            if (!in_array($filters['species'], $validSpecies)) {
-                throw new RuntimeException("Invalid species filter");
+        try {
+            // Debug logging
+            error_log("PetService::listPets called with filters: " . print_r($filters, true));
+            
+            // Get total count without pagination
+            $countQuery = "SELECT COUNT(DISTINCT p.pet_id) FROM Pet p";
+            $whereConditions = [];
+            $params = [];
+            
+            // Build basic query
+            $query = "SELECT DISTINCT p.*, s.name as shelter_name 
+                     FROM Pet p
+                     LEFT JOIN Shelter s ON p.shelter_id = s.shelter_id";
+            
+            // Add search conditions if present
+            if (!empty($filters['search'])) {
+                $whereConditions[] = "(p.name LIKE ? OR p.breed LIKE ? OR p.description LIKE ?)";
+                $searchTerm = '%' . $filters['search'] . '%';
+                $params = array_merge($params, [$searchTerm, $searchTerm, $searchTerm]);
             }
+            
+            // Add species filter if present
+            if (!empty($filters['species'])) {
+                $whereConditions[] = "p.species = ?";
+                $params[] = $filters['species'];
+            }
+            
+            // Add WHERE clause if conditions exist
+            if (!empty($whereConditions)) {
+                $whereClause = " WHERE " . implode(" AND ", $whereConditions);
+                $countQuery .= $whereClause;
+                $query .= $whereClause;
+            }
+            
+            // Add ORDER BY
+            $query .= " ORDER BY p.pet_id DESC";
+            
+            // Add LIMIT and OFFSET
+            $limit = (int)($filters['limit'] ?? 12);
+            $offset = (int)($filters['offset'] ?? 0);
+            $query .= " LIMIT ? OFFSET ?";
+            
+            // Clone params for count query
+            $countParams = $params;
+            
+            // Add limit and offset to params for main query
+            $params[] = $limit;
+            $params[] = $offset;
+            
+            // Get total count
+            $stmt = $this->db->prepare($countQuery);
+            $stmt->execute($countParams);
+            $total = (int)$stmt->fetchColumn();
+            
+            // Debug logging
+            error_log("Query: " . $query);
+            error_log("Params: " . print_r($params, true));
+            
+            // Get paginated results
+            $stmt = $this->db->prepare($query);
+            $stmt->execute($params);
+            $pets = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            
+            // Fetch traits for each pet
+            foreach ($pets as &$pet) {
+                $traitQuery = "
+                    SELECT t.trait_name, tc.name as category
+                    FROM Pet_Trait_Relation ptr
+                    JOIN Pet_Trait t ON ptr.trait_id = t.trait_id
+                    LEFT JOIN Trait_Category tc ON t.category_id = tc.category_id
+                    WHERE ptr.pet_id = ?
+                ";
+                
+                $stmt = $this->db->prepare($traitQuery);
+                $stmt->execute([$pet['pet_id']]);
+                $traits = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+                
+                $pet['traits'] = $this->formatTraits($traits);
+            }
+            
+            // Debug logging
+            error_log("Found " . count($pets) . " pets");
+            
+            return [
+                'pets' => $pets,
+                'total' => $total
+            ];
+            
+        } catch (\Exception $e) {
+            error_log("Error in PetService::listPets: " . $e->getMessage());
+            error_log("Stack trace: " . $e->getTraceAsString());
+            throw new \RuntimeException("Failed to fetch pets: " . $e->getMessage());
         }
-        
-        return $this->petModel->findAll($filters);
     }
     
     public function addTrait(string $traitName): array {
