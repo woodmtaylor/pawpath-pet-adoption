@@ -17,6 +17,8 @@ import ProfileSettings from './pages/profile/ProfileSettings';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 import AdoptionFormPage from './pages/AdoptionFormPage';
 import ApplicationsPage from './pages/profile/ApplicationsPage';
+import FavoritesPage from './pages/profile/FavoritesPage';
+
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -74,6 +76,15 @@ function App() {
               element={
                 <ProtectedRoute>
                   <ApplicationsPage />
+                </ProtectedRoute>
+              } 
+            />
+
+            <Route 
+              path="/profile/favorites" 
+              element={
+                <ProtectedRoute>
+                  <FavoritesPage />
                 </ProtectedRoute>
               } 
             />

@@ -28,23 +28,29 @@ function PetDetailPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
-  const [pet, setPet] = useState<Pet | null>(null);
+  const [pet, setPet] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(null);
+  const [isFavorited, setIsFavorited] = useState(false);
+  const [isToggling, setIsToggling] = useState(false);
 
   useEffect(() => {
     const fetchPet = async () => {
       try {
         setIsLoading(true);
         const response = await api.get(`/pets/${id}`);
-        console.log('API Response:', response.data); // Debug log
-        
         if (response.data.success) {
           setPet(response.data.data);
+          
+          // Check if pet is favorited
+          if (isAuthenticated) {
+            const favResponse = await api.get(`/pets/${id}/favorite`);
+            setIsFavorited(favResponse.data.data.is_favorited);
+          }
         } else {
           throw new Error(response.data.error || 'Failed to load pet details');
         }
-      } catch (err: any) {
+      } catch (err) {
         const errorMsg = err.response?.data?.error || err.message || 'Failed to load pet details';
         setError(errorMsg);
         toast({
@@ -58,7 +64,48 @@ function PetDetailPage() {
     };
 
     fetchPet();
-  }, [id, toast]);
+  }, [id, isAuthenticated, toast]);
+
+  const handleFavoriteToggle = async () => {
+    if (!isAuthenticated) {
+      navigate('/login', { state: { from: `/pets/${id}` } });
+      return;
+    }
+
+    try {
+      setIsToggling(true);
+      if (isFavorited) {
+        await api.delete(`/pets/${id}/favorite`);
+        toast({
+          title: "Removed from favorites",
+          description: "Pet has been removed from your favorites",
+        });
+      } else {
+        await api.post(`/pets/${id}/favorite`);
+        toast({
+          title: "Added to favorites",
+          description: "Pet has been added to your favorites",
+        });
+      }
+      setIsFavorited(!isFavorited);
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update favorites",
+      });
+    } finally {
+      setIsToggling(false);
+    }
+  };
+
+  const handleAdopt = () => {
+    if (!isAuthenticated) {
+      navigate('/login', { state: { from: `/pets/${id}` } });
+      return;
+    }
+    navigate(`/adopt/${id}`);
+  };
 
   if (isLoading) {
     return (
@@ -90,14 +137,6 @@ function PetDetailPage() {
       </div>
     );
   }
-
-  const handleAdopt = () => {
-    if (!isAuthenticated) {
-      navigate('/login', { state: { from: `/pets/${id}` } });
-      return;
-    }
-    navigate(`/adopt/${id}`);
-  };
 
   return (
     <div className="container max-w-4xl mx-auto p-4">
@@ -180,8 +219,13 @@ function PetDetailPage() {
             <Button onClick={handleAdopt} className="flex-1">
               Start Adoption Process
             </Button>
-            <Button variant="outline" className="w-auto">
-              <Heart className="h-4 w-4" />
+            <Button 
+              variant="outline" 
+              className={`w-auto ${isFavorited ? 'bg-primary text-primary-foreground' : ''}`}
+              onClick={handleFavoriteToggle}
+              disabled={isToggling}
+            >
+              <Heart className={`h-4 w-4 ${isFavorited ? 'fill-current' : ''}`} />
             </Button>
           </div>
         </div>

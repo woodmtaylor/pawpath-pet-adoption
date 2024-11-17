@@ -3,13 +3,12 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PetFilters } from '@/components/pets/PetFilters';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Search, PawPrint } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Search, PawPrint, ArrowRight } from 'lucide-react';
 import api from '@/lib/axios';
 import { Pet, ApiResponse } from '@/types/api';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { getStoredToken } from '@/stores/auth';
 
 interface PetFiltersState {
     species?: string;
@@ -38,7 +37,7 @@ function PetsPage() {
     const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
     const [filters, setFilters] = useState<PetFiltersState>({});
     const [availableTraits, setAvailableTraits] = useState<string[]>([]);
-    const [currentPage, setCurrentPage] = useState(1);
+    const [currentPage, setCurrentPage] = useState(parseInt(searchParams.get('page') || '1'));
     const [totalPages, setTotalPages] = useState(1);
     const perPage = 12;
     const { toast } = useToast();
@@ -49,6 +48,22 @@ function PetsPage() {
             navigate('/login', { state: { from: '/pets' } });
         }
     }, [isAuthenticated, navigate]);
+
+    useEffect(() => {
+        // Update URL with current page and search term
+        const newSearchParams = new URLSearchParams(searchParams);
+        if (currentPage !== 1) {
+            newSearchParams.set('page', currentPage.toString());
+        } else {
+            newSearchParams.delete('page');
+        }
+        if (searchTerm) {
+            newSearchParams.set('search', searchTerm);
+        } else {
+            newSearchParams.delete('search');
+        }
+        setSearchParams(newSearchParams);
+    }, [currentPage, searchTerm]);
 
     useEffect(() => {
         const fetchTraits = async () => {
@@ -78,11 +93,14 @@ function PetsPage() {
                     }
                 });
 
-                console.log('API Response:', response.data);
-
                 if (response.data.success) {
                     setPets(response.data.data.items);
                     setTotalPages(Math.ceil(response.data.data.total / perPage));
+                    
+                    // If current page is greater than total pages, reset to page 1
+                    if (currentPage > Math.ceil(response.data.data.total / perPage)) {
+                        setCurrentPage(1);
+                    }
                 } else {
                     throw new Error(response.data.error || 'Failed to fetch pets');
                 }
@@ -105,12 +123,16 @@ function PetsPage() {
 
     const handleSearch = (event: React.FormEvent) => {
         event.preventDefault();
-        setCurrentPage(1); // Reset to first page on new search
+        setCurrentPage(1);
     };
 
     const handleFilterChange = (newFilters: PetFiltersState) => {
         setFilters(newFilters);
-        setCurrentPage(1); // Reset to first page on filter change
+        setCurrentPage(1);
+    };
+
+    const handlePetClick = (petId: number) => {
+        navigate(`/pets/${petId}`);
     };
 
     return (
@@ -169,7 +191,11 @@ function PetsPage() {
                 <>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {pets.map((pet) => (
-                            <Card key={pet.pet_id} className="overflow-hidden">
+                            <Card 
+                                key={pet.pet_id} 
+                                className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+                                onClick={() => handlePetClick(pet.pet_id)}
+                            >
                                 <CardHeader>
                                     <CardTitle>{pet.name}</CardTitle>
                                     <CardDescription>
@@ -198,6 +224,11 @@ function PetsPage() {
                                         </div>
                                     ))}
                                 </CardContent>
+                                <CardFooter className="justify-end">
+                                    <Button variant="ghost" size="sm">
+                                        View Details <ArrowRight className="ml-2 h-4 w-4" />
+                                    </Button>
+                                </CardFooter>
                             </Card>
                         ))}
                     </div>
@@ -211,7 +242,17 @@ function PetsPage() {
                             >
                                 Previous
                             </Button>
-                            <div className="flex items-center px-4">
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                                <Button
+                                    key={page}
+                                    variant={currentPage === page ? "default" : "outline"}
+                                    onClick={() => setCurrentPage(page)}
+                                    className="hidden sm:inline-flex"
+                                >
+                                    {page}
+                                </Button>
+                            ))}
+                            <div className="flex items-center px-4 sm:hidden">
                                 Page {currentPage} of {totalPages}
                             </div>
                             <Button

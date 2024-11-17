@@ -155,6 +155,96 @@ $app->group('/api', function ($group) {
         $controller = new PetController();
         return $controller->listTraits($request, $response);
     });
+
+    $group->get('/pets/{id}/favorite', function ($request, $response, $args) {
+        $userId = $request->getAttribute('user_id');
+        $petId = (int) $args['id'];
+        $service = new \PawPath\services\FavoriteService();
+        
+        try {
+            $isFavorited = $service->isFavorited($userId, $petId);
+            $response->getBody()->write(json_encode([
+                'success' => true,
+                'data' => ['is_favorited' => $isFavorited]
+            ]));
+            return $response->withHeader('Content-Type', 'application/json');
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'error' => $e->getMessage()
+            ]));
+            return $response->withHeader('Content-Type', 'application/json')
+                           ->withStatus(400);
+        }
+    });
+
+    // Add a pet to favorites
+    $group->post('/pets/{id}/favorite', function ($request, $response, $args) {
+        $userId = $request->getAttribute('user_id');
+        $petId = (int) $args['id'];
+        $service = new \PawPath\services\FavoriteService();
+        
+        try {
+            $result = $service->addFavorite($userId, $petId);
+            $response->getBody()->write(json_encode([
+                'success' => true,
+                'data' => $result
+            ]));
+            return $response->withHeader('Content-Type', 'application/json');
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'error' => $e->getMessage()
+            ]));
+            return $response->withHeader('Content-Type', 'application/json')
+                           ->withStatus(400);
+        }
+    });
+
+    // Remove a pet from favorites
+    $group->delete('/pets/{id}/favorite', function ($request, $response, $args) {
+        $userId = $request->getAttribute('user_id');
+        $petId = (int) $args['id'];
+        $service = new \PawPath\services\FavoriteService();
+        
+        try {
+            $result = $service->removeFavorite($userId, $petId);
+            $response->getBody()->write(json_encode([
+                'success' => true,
+                'data' => ['removed' => $result]
+            ]));
+            return $response->withHeader('Content-Type', 'application/json');
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'error' => $e->getMessage()
+            ]));
+            return $response->withHeader('Content-Type', 'application/json')
+                           ->withStatus(400);
+        }
+    });
+
+    // Get user's favorited pets
+    $group->get('/favorites', function ($request, $response) {
+        $userId = $request->getAttribute('user_id');
+        $service = new \PawPath\services\FavoriteService();
+        
+        try {
+            $favorites = $service->getUserFavorites($userId);
+            $response->getBody()->write(json_encode([
+                'success' => true,
+                'data' => $favorites
+            ]));
+            return $response->withHeader('Content-Type', 'application/json');
+        } catch (\Exception $e) {
+            $response->getBody()->write(json_encode([
+                'success' => false,
+                'error' => $e->getMessage()
+            ]));
+            return $response->withHeader('Content-Type', 'application/json')
+                           ->withStatus(400);
+        }
+    });
     
     // Adoption Application routes
     $group->post('/adoptions', function ($request, $response) {

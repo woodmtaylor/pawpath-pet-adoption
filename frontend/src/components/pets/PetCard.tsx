@@ -12,7 +12,7 @@ interface PetCardProps {
     gender: string;
     description: string;
     shelter_name: string;
-    traits: string[] | { [category: string]: string[] }; // Updated to handle both formats
+    traits?: { [category: string]: string[] }; // Make traits optional
     images?: string[];
   };
   onClick?: () => void;
@@ -20,16 +20,9 @@ interface PetCardProps {
 
 export function PetCard({ pet, onClick }: PetCardProps) {
   const renderTraits = () => {
-    if (Array.isArray(pet.traits)) {
-      return pet.traits.map((trait) => (
-        <Badge
-          key={trait}
-          variant="secondary"
-          className="text-xs"
-        >
-          {trait}
-        </Badge>
-      ));
+    // Handle case where traits is undefined or null
+    if (!pet.traits) {
+      return null;
     }
 
     return Object.entries(pet.traits).map(([category, traits]) => (
@@ -76,9 +69,11 @@ export function PetCard({ pet, onClick }: PetCardProps) {
           {pet.description}
         </p>
 
-        <div className="flex flex-wrap gap-2 mb-4">
-          {renderTraits()}
-        </div>
+        {pet.traits && Object.keys(pet.traits).length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-4">
+            {renderTraits()}
+          </div>
+        )}
 
         <div className="flex items-center text-sm text-muted-foreground">
           <MapPin className="h-4 w-4 mr-1" />
