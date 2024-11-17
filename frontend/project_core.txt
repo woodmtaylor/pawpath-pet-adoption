@@ -1,3 +1,16 @@
+# PawPath Pet Adoption Frontend Codebase
+Generated on Sun Nov 17 11:36:02 CST 2024
+
+
+
+### File: ./src/components/layout/MainLayout.tsx
+```
+
+```
+
+
+### File: ./src/components/layout/Navbar.tsx
+```
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
@@ -175,6 +188,18 @@ function Navbar() {
 }
 
 export default Navbar;
+
+```
+
+
+### File: ./src/components/shared/LoadingSpinner.tsx
+```
+
+```
+
+
+### File: ./src/components/pets/PetCard.tsx
+```
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { PawPrint, MapPin } from 'lucide-react';
@@ -265,6 +290,12 @@ export function PetCard({ pet, onClick }: PetCardProps) {
     </Card>
   );
 }
+
+```
+
+
+### File: ./src/components/pets/PetFilters.tsx
+```
 import { useState } from 'react';
 import {
   Sheet,
@@ -469,6 +500,12 @@ export function PetFilters({ onFiltersChange, initialFilters, availableTraits }:
     </Sheet>
   );
 }
+
+```
+
+
+### File: ./src/components/auth/RoleProtectedRoute.tsx
+```
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { profileService } from '@/services/profile';
@@ -496,6 +533,12 @@ export function RoleProtectedRoute({ children, requiredRole }: RoleProtectedRout
 
   return <>{children}</>;
 }
+
+```
+
+
+### File: ./src/components/auth/ProtectedRoute.tsx
+```
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -514,6 +557,12 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   return <>{children}</>;
 }
+
+```
+
+
+### File: ./src/contexts/AuthContext.tsx
+```
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useAtom } from 'jotai';
 import { 
@@ -670,12 +719,24 @@ export const useAuth = () => {
   }
   return context;
 };
+
+```
+
+
+### File: ./src/lib/utils.ts
+```
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
+
+```
+
+
+### File: ./src/lib/axios.ts
+```
 import axios from 'axios';
 import { getStoredToken } from '@/stores/auth';
 
@@ -710,6 +771,12 @@ api.interceptors.response.use(
 );
 
 export default api;
+
+```
+
+
+### File: ./src/pages/HomePage.tsx
+```
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -838,6 +905,12 @@ function HomePage() {
 }
 
 export default HomePage;
+
+```
+
+
+### File: ./src/pages/AdoptionFormPage.tsx
+```
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -1034,6 +1107,12 @@ export default function AdoptionFormPage() {
     </div>
   );
 }
+
+```
+
+
+### File: ./src/pages/QuizResultsPage.tsx
+```
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -1214,6 +1293,12 @@ function QuizResultsPage() {
 }
 
 export default QuizResultsPage;
+
+```
+
+
+### File: ./src/pages/PetDetailPage.tsx
+```
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Heart, MapPin, Phone, Mail, Calendar, Info, PawPrint } from 'lucide-react';
@@ -1407,6 +1492,12 @@ function PetDetailPage() {
 }
 
 export default PetDetailPage;
+
+```
+
+
+### File: ./src/pages/PetsPage.tsx
+```
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PetFilters } from '@/components/pets/PetFilters';
@@ -1639,6 +1730,12 @@ function PetsPage() {
 }
 
 export default PetsPage;
+
+```
+
+
+### File: ./src/pages/shelter/ShelterManagement.tsx
+```
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -1799,6 +1896,12 @@ export default function ShelterManagement() {
     </div>
   );
 }
+
+```
+
+
+### File: ./src/pages/shelter/ShelterDashboard.tsx
+```
 import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -1929,6 +2032,12 @@ export default function ShelterDashboard() {
     </div>
   );
 }
+
+```
+
+
+### File: ./src/pages/QuizPage.tsx
+```
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -2156,6 +2265,12 @@ function QuizPage() {
 }
 
 export default QuizPage;
+
+```
+
+
+### File: ./src/pages/RegisterPage.tsx
+```
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -2389,6 +2504,12 @@ function RegisterPage() {
 }
 
 export default RegisterPage;
+
+```
+
+
+### File: ./src/pages/LoginPage.tsx
+```
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -2520,6 +2641,12 @@ function LoginPage() {
 }
 
 export default LoginPage;
+
+```
+
+
+### File: ./src/pages/ProfilePage.tsx
+```
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -2666,6 +2793,12 @@ export default function ProfilePage() {
         </div>
     );
 }
+
+```
+
+
+### File: ./src/pages/profile/ProfileSettings.tsx
+```
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -2921,6 +3054,12 @@ export default function ProfileSettings() {
     </div>
   );
 }
+
+```
+
+
+### File: ./src/pages/profile/ApplicationsPage.tsx
+```
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -3072,6 +3211,12 @@ export default function ApplicationsPage() {
     </div>
   );
 }
+
+```
+
+
+### File: ./src/pages/admin/AdminDashboard.tsx
+```
 import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -3194,6 +3339,12 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
+```
+
+
+### File: ./src/pages/admin/UserManagement.tsx
+```
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -3362,6 +3513,12 @@ export default function UserManagement() {
     </div>
   );
 }
+
+```
+
+
+### File: ./src/pages/UnauthorizedPage.tsx
+```
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Shield, Home } from 'lucide-react';
@@ -3405,6 +3562,12 @@ export default function UnauthorizedPage() {
     </div>
   );
 }
+
+```
+
+
+### File: ./src/App.css
+```
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -3496,6 +3659,12 @@ export default function UnauthorizedPage() {
     @apply bg-background text-foreground;
   }
 }
+
+```
+
+
+### File: ./src/types/api.ts
+```
 export interface PetTrait {
     trait_id: number;
     trait_name: string;
@@ -3530,6 +3699,12 @@ export interface PaginatedResponse<T> extends ApiResponse<T> {
         perPage: number;
     };
 }
+
+```
+
+
+### File: ./src/types/profile.ts
+```
 export interface UserProfile {
     profile_id: number;
     user_id: number;
@@ -3563,6 +3738,18 @@ export interface ProfileUpdateData {
     other_pets?: string;
     household_members?: number;
 }
+
+```
+
+
+### File: ./src/types/index.ts
+```
+
+```
+
+
+### File: ./src/index.css
+```
 {
   "name": "frontend",
   "private": true,
@@ -3616,6 +3803,12 @@ export interface ProfileUpdateData {
     "vitest": "^0.34.6"
   }
 }
+
+```
+
+
+### File: ./src/stores/auth.ts
+```
 import { atom } from 'jotai';
 
 export interface User {
@@ -3647,6 +3840,18 @@ export const setStoredUser = (user: User) => {
 export const removeStoredUser = () => {
   localStorage.removeItem('user');
 };
+
+```
+
+
+### File: ./src/services/api.ts
+```
+
+```
+
+
+### File: ./src/services/profile.ts
+```
 import api from '@/lib/axios';
 import { UserProfile, ProfileUpdateData } from '@/types/profile';
 import { ApiResponse } from '@/types/api';
@@ -3694,6 +3899,12 @@ export const profileService = {
         return roles[requiredRole]?.includes(user.role) || false;
     }
 };
+
+```
+
+
+### File: ./src/services/auth.ts
+```
 import api from '@/lib/axios'
 
 interface LoginCredentials {
@@ -3731,6 +3942,12 @@ export const authService = {
         localStorage.removeItem('token');
     }
 }
+
+```
+
+
+### File: ./src/hooks/use-toast.ts
+```
 "use client"
 
 // Inspired by react-hot-toast library
@@ -3925,6 +4142,12 @@ function useToast() {
 }
 
 export { useToast, toast }
+
+```
+
+
+### File: ./src/main.tsx
+```
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'  // Add .tsx extension
@@ -3937,6 +4160,12 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <Toaster />
   </React.StrictMode>
 )
+
+```
+
+
+### File: ./src/App.tsx
+```
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
@@ -4069,6 +4298,12 @@ function App() {
 }
 
 export default App;
+
+```
+
+
+### File: ./vite.config.ts
+```
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
@@ -4089,6 +4324,12 @@ export default defineConfig({
     }
   }
 })
+
+```
+
+
+### File: ./package.json
+```
 {
   "name": "frontend",
   "private": true,
@@ -4153,6 +4394,12 @@ export default defineConfig({
     "vitest": "^0.34.6"
   }
 }
+
+```
+
+
+### File: ./tailwind.config.cjs
+```
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: ['class'],
@@ -4244,6 +4491,12 @@ module.exports = {
   },
   plugins: [require("tailwindcss-animate")],
 }
+
+```
+
+
+### File: ./tsconfig.json
+```
 {
   "compilerOptions": {
     "target": "ES2020",
@@ -4269,3 +4522,5 @@ module.exports = {
   "include": ["src"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
+
+```
