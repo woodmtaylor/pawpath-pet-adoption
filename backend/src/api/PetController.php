@@ -74,6 +74,15 @@ class PetController {
             $queryParams = $request->getQueryParams();
             error_log("Received request params: " . print_r($queryParams, true));
             
+            // Get pagination parameters
+            $page = isset($queryParams['page']) ? (int)$queryParams['page'] : 1;
+            $perPage = isset($queryParams['perPage']) ? (int)$queryParams['perPage'] : 12;
+            $offset = ($page - 1) * $perPage;
+
+            // Add offset and limit to filters
+            $queryParams['offset'] = $offset;
+            $queryParams['limit'] = $perPage;
+            
             $result = $this->petService->listPets($queryParams);
             error_log("Query result: " . print_r($result, true));
             
@@ -82,8 +91,8 @@ class PetController {
                 'data' => [
                     'items' => $result['pets'],
                     'total' => $result['total'],
-                    'page' => (int)($queryParams['page'] ?? 1),
-                    'perPage' => (int)($queryParams['perPage'] ?? 12)
+                    'page' => $page,
+                    'perPage' => $perPage
                 ]
             ];
             

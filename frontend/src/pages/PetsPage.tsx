@@ -41,29 +41,34 @@ function PetsPage() {
     const { toast } = useToast();
     const { isAuthenticated } = useAuth();
 
-    // Get current page from URL
     const currentPage = parseInt(searchParams.get('page') || '1', 10);
     const perPage = 12;
 
     const updateUrlParams = useCallback((page: number, search: string, currentFilters: PetFiltersState) => {
-        const newParams = new URLSearchParams();
+        const newParams = new URLSearchParams(searchParams);
         
         if (page > 1) newParams.set('page', page.toString());
-        if (search) newParams.set('search', search);
+        else newParams.delete('page');
         
-        // Add filters to URL if they exist
+        if (search) newParams.set('search', search);
+        else newParams.delete('search');
+        
+        // Handle filters
         Object.entries(currentFilters).forEach(([key, value]) => {
             if (value !== undefined && value !== null && value !== '') {
                 if (Array.isArray(value)) {
+                    newParams.delete(key);
                     value.forEach(v => newParams.append(key, v));
                 } else {
                     newParams.set(key, value.toString());
                 }
+            } else {
+                newParams.delete(key);
             }
         });
 
         setSearchParams(newParams);
-    }, [setSearchParams]);
+    }, [setSearchParams, searchParams]);
 
     // Authentication check
     useEffect(() => {
@@ -86,17 +91,20 @@ function PetsPage() {
         fetchTraits();
     }, []);
 
-    // Fetch pets with debounce
+    // Fetch pets with pagination
     useEffect(() => {
         const fetchPets = async () => {
             try {
                 setLoading(true);
                 setError(null);
 
+                const offset = (currentPage - 1) * perPage;
+
                 const response = await api.get<ApiResponse<PaginatedResponse>>('/pets', { 
                     params: {
                         page: currentPage,
                         perPage,
+                        offset,
                         search: searchTerm,
                         ...filters
                     }
@@ -107,8 +115,7 @@ function PetsPage() {
                     const newTotalPages = Math.ceil(response.data.data.total / perPage);
                     setTotalPages(newTotalPages);
                     
-                    // If current page is greater than total pages, reset to page 1
-                    if (currentPage > newTotalPages) {
+                    if (currentPage > newTotalPages && newTotalPages > 0) {
                         updateUrlParams(1, searchTerm, filters);
                     }
                 } else {
@@ -127,9 +134,11 @@ function PetsPage() {
             }
         };
 
-        const timeoutId = setTimeout(fetchPets, 300);
-        return () => clearTimeout(timeoutId);
-    }, [currentPage, searchTerm, filters, toast, updateUrlParams]);
+        if (isAuthenticated) {
+            const timeoutId = setTimeout(fetchPets, 300);
+            return () => clearTimeout(timeoutId);
+        }
+    }, [currentPage, searchTerm, filters, toast, updateUrlParams, isAuthenticated]);
 
     const handleSearch = (event: React.FormEvent) => {
         event.preventDefault();
