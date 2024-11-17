@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
 
 interface Pet {
@@ -15,15 +16,10 @@ interface Pet {
   age: number;
   gender: string;
   description: string;
-  images: string[];
-  traits: {
+  shelter_name: string;  // Changed from nested shelter object
+  images?: string[];
+  traits?: {
     [category: string]: string[];
-  };
-  shelter: {
-    name: string;
-    address: string;
-    phone: string;
-    email: string;
   };
 }
 
@@ -31,25 +27,38 @@ function PetDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
+  const { toast } = useToast();
   const [pet, setPet] = useState<Pet | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeImage, setActiveImage] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchPet = async () => {
       try {
+        setIsLoading(true);
         const response = await api.get(`/pets/${id}`);
-        setPet(response.data);
+        console.log('API Response:', response.data); // Debug log
+        
+        if (response.data.success) {
+          setPet(response.data.data);
+        } else {
+          throw new Error(response.data.error || 'Failed to load pet details');
+        }
       } catch (err: any) {
-        setError(err.response?.data?.error || 'Failed to load pet details');
+        const errorMsg = err.response?.data?.error || err.message || 'Failed to load pet details';
+        setError(errorMsg);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: errorMsg,
+        });
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchPet();
-  }, [id]);
+  }, [id, toast]);
 
   if (isLoading) {
     return (
@@ -107,7 +116,7 @@ function PetDetailPage() {
           <div className="aspect-square relative bg-muted rounded-lg overflow-hidden">
             {pet.images && pet.images.length > 0 ? (
               <img
-                src={pet.images[activeImage]}
+                src={pet.images[0]}
                 alt={pet.name}
                 className="object-cover w-full h-full"
               />
@@ -117,26 +126,6 @@ function PetDetailPage() {
               </div>
             )}
           </div>
-          
-          {pet.images && pet.images.length > 1 && (
-            <div className="grid grid-cols-4 gap-2">
-              {pet.images.map((image, index) => (
-                <button
-                  key={index}
-                  onClick={() => setActiveImage(index)}
-                  className={`aspect-square rounded-md overflow-hidden border-2 ${
-                    index === activeImage ? 'border-primary' : 'border-transparent'
-                  }`}
-                >
-                  <img
-                    src={image}
-                    alt={`${pet.name} - view ${index + 1}`}
-                    className="object-cover w-full h-full"
-                  />
-                </button>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* Pet Details */}
@@ -153,23 +142,25 @@ function PetDetailPage() {
           </div>
 
           {/* Traits */}
-          <div>
-            <h2 className="text-xl font-semibold mb-3">Characteristics</h2>
-            {Object.entries(pet.traits).map(([category, traits]) => (
-              <div key={category} className="mb-4">
-                <h3 className="text-sm font-medium text-muted-foreground mb-2">
-                  {category}:
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {traits.map((trait) => (
-                    <Badge key={trait} variant="outline">
-                      {trait}
-                    </Badge>
-                  ))}
+          {pet.traits && Object.keys(pet.traits).length > 0 && (
+            <div>
+              <h2 className="text-xl font-semibold mb-3">Characteristics</h2>
+              {Object.entries(pet.traits).map(([category, traits]) => (
+                <div key={category} className="mb-4">
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">
+                    {category}:
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {traits.map((trait) => (
+                      <Badge key={trait} variant="outline">
+                        {trait}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
           {/* Shelter Information */}
           <Card>
@@ -178,19 +169,7 @@ function PetDetailPage() {
               <div className="space-y-2">
                 <p className="flex items-center">
                   <MapPin className="mr-2 h-4 w-4" />
-                  {pet.shelter.name}
-                </p>
-                <p className="flex items-center">
-                  <Info className="mr-2 h-4 w-4" />
-                  {pet.shelter.address}
-                </p>
-                <p className="flex items-center">
-                  <Phone className="mr-2 h-4 w-4" />
-                  {pet.shelter.phone}
-                </p>
-                <p className="flex items-center">
-                  <Mail className="mr-2 h-4 w-4" />
-                  {pet.shelter.email}
+                  {pet.shelter_name}
                 </p>
               </div>
             </CardContent>

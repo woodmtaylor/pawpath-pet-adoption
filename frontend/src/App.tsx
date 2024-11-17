@@ -15,6 +15,7 @@ import PetDetailPage from './pages/PetDetailPage';
 import ProfilePage from './pages/ProfilePage';
 import ProfileSettings from './pages/profile/ProfileSettings';
 import UnauthorizedPage from './pages/UnauthorizedPage';
+import AdoptionFormPage from './pages/AdoptionFormPage';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -45,6 +46,15 @@ function App() {
               element={
                 <ProtectedRoute>
                   <ProfilePage />
+                </ProtectedRoute>
+              } 
+            />
+
+            <Route 
+              path="/adopt/:id" 
+              element={
+                <ProtectedRoute>
+                  <AdoptionFormPage />
                 </ProtectedRoute>
               } 
             />
