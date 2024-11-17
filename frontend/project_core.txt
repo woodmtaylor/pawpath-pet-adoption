@@ -1,5 +1,5 @@
 # PawPath Pet Adoption Frontend Codebase
-Generated on Sun Nov 17 11:36:02 CST 2024
+Generated on Sun Nov 17 17:05:28 CST 2024
 
 
 
@@ -214,7 +214,7 @@ interface PetCardProps {
     gender: string;
     description: string;
     shelter_name: string;
-    traits: string[] | { [category: string]: string[] }; // Updated to handle both formats
+    traits?: { [category: string]: string[] }; // Make traits optional
     images?: string[];
   };
   onClick?: () => void;
@@ -222,16 +222,9 @@ interface PetCardProps {
 
 export function PetCard({ pet, onClick }: PetCardProps) {
   const renderTraits = () => {
-    if (Array.isArray(pet.traits)) {
-      return pet.traits.map((trait) => (
-        <Badge
-          key={trait}
-          variant="secondary"
-          className="text-xs"
-        >
-          {trait}
-        </Badge>
-      ));
+    // Handle case where traits is undefined or null
+    if (!pet.traits) {
+      return null;
     }
 
     return Object.entries(pet.traits).map(([category, traits]) => (
@@ -278,9 +271,11 @@ export function PetCard({ pet, onClick }: PetCardProps) {
           {pet.description}
         </p>
 
-        <div className="flex flex-wrap gap-2 mb-4">
-          {renderTraits()}
-        </div>
+        {pet.traits && Object.keys(pet.traits).length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-4">
+            {renderTraits()}
+          </div>
+        )}
 
         <div className="flex items-center text-sm text-muted-foreground">
           <MapPin className="h-4 w-4 mr-1" />
@@ -508,7 +503,6 @@ export function PetFilters({ onFiltersChange, initialFilters, availableTraits }:
 ```
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { profileService } from '@/services/profile';
 
 interface RoleProtectedRouteProps {
   children: React.ReactNode;
@@ -527,7 +521,17 @@ export function RoleProtectedRoute({ children, requiredRole }: RoleProtectedRout
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (!profileService.hasPermission(requiredRole)) {
+  // Check role authorization
+  const roleHierarchy = {
+    'admin': ['admin'],
+    'shelter_staff': ['admin', 'shelter_staff'],
+    'adopter': ['admin', 'shelter_staff', 'adopter']
+  };
+
+  const userRole = user?.role || 'adopter';
+  const allowedRoles = roleHierarchy[requiredRole] || [];
+
+  if (!allowedRoles.includes(userRole)) {
     return <Navigate to="/unauthorized" replace />;
   }
 
@@ -592,11 +596,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useAtom(userAtom);
   const [isLoading, setIsLoading] = useAtom(authLoadingAtom);
 
-  // Setup axios interceptor for token expiration
+  // Set up axios interceptor for authentication
   useEffect(() => {
-    const interceptor = api.interceptors.response.use(
-      (response) => response,
+    const token = getStoredToken();
+    if (token) {
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    }
+
+    // Add request interceptor
+    const requestInterceptor = api.interceptors.request.use(
+      (config) => {
+        const token = getStoredToken();
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+      },
       (error) => {
+        return Promise.reject(error);
+      }
+    );
+
+    // Add response interceptor
+    const responseInterceptor = api.interceptors.response.use(
+      (response) => response,
+      async (error) => {
         if (error.response?.status === 401) {
           // Token expired or invalid
           logout();
@@ -606,7 +630,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
 
     return () => {
-      api.interceptors.response.eject(interceptor);
+      // Clean up interceptors
+      api.interceptors.request.eject(requestInterceptor);
+      api.interceptors.response.eject(responseInterceptor);
     };
   }, []);
 
@@ -619,15 +645,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const storedUser = getStoredUser();
         
         if (token && storedUser) {
-          // Set default authorization header
           api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
           
           try {
-            // Verify token is still valid with backend
+            // Verify token with backend
             const response = await api.get('/auth/me');
             const userData = response.data.user;
             
-            // Update stored user data if different
             if (JSON.stringify(userData) !== JSON.stringify(storedUser)) {
               setStoredUser(userData);
               setUser(userData);
@@ -635,12 +659,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setUser(storedUser);
             }
           } catch (error) {
-            // If verification fails, clear auth state
             console.error('Token verification failed:', error);
             logout();
           }
         } else {
-          // No stored auth data
           logout();
         }
       } catch (error) {
@@ -652,48 +674,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     initializeAuth();
-  }, [setUser, setIsLoading]);
-
-  const login = async (email: string, password: string) => {
-      try {
-          const response = await api.post('/auth/login', { email, password });
-          const { token, user } = response.data.data;
-          
-          // Store token
-          setStoredToken(token);
-          
-          // Update axios default header
-          api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-          
-          // Store user
-          setStoredUser(user);
-          setUser(user);
-          
-          // Log for debugging
-          console.log('Login successful, token stored');
-      } catch (error) {
-          console.error('Login error:', error);
-          throw error;
-      }
-  };
-
-  useEffect(() => {
-    const token = getStoredToken();
-    if (token) {
-        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        console.log('Token restored from storage');
-      }
   }, []);
 
+  const login = async (email: string, password: string) => {
+    try {
+      const response = await api.post('/auth/login', { email, password });
+      const { token, user: userData } = response.data.data;
+      
+      setStoredToken(token);
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      setStoredUser(userData);
+      setUser(userData);
+      
+      console.log('Login successful, user:', userData);
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    }
+  };
+
   const logout = () => {
-    // Clear stored auth data
     removeStoredToken();
     removeStoredUser();
-    
-    // Clear axios default header
     delete api.defaults.headers.common['Authorization'];
-    
-    // Reset state
     setUser(null);
   };
 
@@ -1329,23 +1332,29 @@ function PetDetailPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
-  const [pet, setPet] = useState<Pet | null>(null);
+  const [pet, setPet] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(null);
+  const [isFavorited, setIsFavorited] = useState(false);
+  const [isToggling, setIsToggling] = useState(false);
 
   useEffect(() => {
     const fetchPet = async () => {
       try {
         setIsLoading(true);
         const response = await api.get(`/pets/${id}`);
-        console.log('API Response:', response.data); // Debug log
-        
         if (response.data.success) {
           setPet(response.data.data);
+          
+          // Check if pet is favorited
+          if (isAuthenticated) {
+            const favResponse = await api.get(`/pets/${id}/favorite`);
+            setIsFavorited(favResponse.data.data.is_favorited);
+          }
         } else {
           throw new Error(response.data.error || 'Failed to load pet details');
         }
-      } catch (err: any) {
+      } catch (err) {
         const errorMsg = err.response?.data?.error || err.message || 'Failed to load pet details';
         setError(errorMsg);
         toast({
@@ -1359,7 +1368,48 @@ function PetDetailPage() {
     };
 
     fetchPet();
-  }, [id, toast]);
+  }, [id, isAuthenticated, toast]);
+
+  const handleFavoriteToggle = async () => {
+    if (!isAuthenticated) {
+      navigate('/login', { state: { from: `/pets/${id}` } });
+      return;
+    }
+
+    try {
+      setIsToggling(true);
+      if (isFavorited) {
+        await api.delete(`/pets/${id}/favorite`);
+        toast({
+          title: "Removed from favorites",
+          description: "Pet has been removed from your favorites",
+        });
+      } else {
+        await api.post(`/pets/${id}/favorite`);
+        toast({
+          title: "Added to favorites",
+          description: "Pet has been added to your favorites",
+        });
+      }
+      setIsFavorited(!isFavorited);
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update favorites",
+      });
+    } finally {
+      setIsToggling(false);
+    }
+  };
+
+  const handleAdopt = () => {
+    if (!isAuthenticated) {
+      navigate('/login', { state: { from: `/pets/${id}` } });
+      return;
+    }
+    navigate(`/adopt/${id}`);
+  };
 
   if (isLoading) {
     return (
@@ -1391,14 +1441,6 @@ function PetDetailPage() {
       </div>
     );
   }
-
-  const handleAdopt = () => {
-    if (!isAuthenticated) {
-      navigate('/login', { state: { from: `/pets/${id}` } });
-      return;
-    }
-    navigate(`/adopt/${id}`);
-  };
 
   return (
     <div className="container max-w-4xl mx-auto p-4">
@@ -1481,8 +1523,13 @@ function PetDetailPage() {
             <Button onClick={handleAdopt} className="flex-1">
               Start Adoption Process
             </Button>
-            <Button variant="outline" className="w-auto">
-              <Heart className="h-4 w-4" />
+            <Button 
+              variant="outline" 
+              className={`w-auto ${isFavorited ? 'bg-primary text-primary-foreground' : ''}`}
+              onClick={handleFavoriteToggle}
+              disabled={isToggling}
+            >
+              <Heart className={`h-4 w-4 ${isFavorited ? 'fill-current' : ''}`} />
             </Button>
           </div>
         </div>
@@ -1498,18 +1545,17 @@ export default PetDetailPage;
 
 ### File: ./src/pages/PetsPage.tsx
 ```
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PetFilters } from '@/components/pets/PetFilters';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Search, PawPrint } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Search, PawPrint, ArrowRight } from 'lucide-react';
 import api from '@/lib/axios';
 import { Pet, ApiResponse } from '@/types/api';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
-import { getStoredToken } from '@/stores/auth';
 
 interface PetFiltersState {
     species?: string;
@@ -1538,18 +1584,42 @@ function PetsPage() {
     const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
     const [filters, setFilters] = useState<PetFiltersState>({});
     const [availableTraits, setAvailableTraits] = useState<string[]>([]);
-    const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
-    const perPage = 12;
     const { toast } = useToast();
     const { isAuthenticated } = useAuth();
 
+    // Get current page from URL
+    const currentPage = parseInt(searchParams.get('page') || '1', 10);
+    const perPage = 12;
+
+    const updateUrlParams = useCallback((page: number, search: string, currentFilters: PetFiltersState) => {
+        const newParams = new URLSearchParams();
+        
+        if (page > 1) newParams.set('page', page.toString());
+        if (search) newParams.set('search', search);
+        
+        // Add filters to URL if they exist
+        Object.entries(currentFilters).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+                if (Array.isArray(value)) {
+                    value.forEach(v => newParams.append(key, v));
+                } else {
+                    newParams.set(key, value.toString());
+                }
+            }
+        });
+
+        setSearchParams(newParams);
+    }, [setSearchParams]);
+
+    // Authentication check
     useEffect(() => {
         if (!isAuthenticated) {
             navigate('/login', { state: { from: '/pets' } });
         }
     }, [isAuthenticated, navigate]);
 
+    // Fetch available traits
     useEffect(() => {
         const fetchTraits = async () => {
             try {
@@ -1563,6 +1633,7 @@ function PetsPage() {
         fetchTraits();
     }, []);
 
+    // Fetch pets with debounce
     useEffect(() => {
         const fetchPets = async () => {
             try {
@@ -1578,11 +1649,15 @@ function PetsPage() {
                     }
                 });
 
-                console.log('API Response:', response.data);
-
                 if (response.data.success) {
                     setPets(response.data.data.items);
-                    setTotalPages(Math.ceil(response.data.data.total / perPage));
+                    const newTotalPages = Math.ceil(response.data.data.total / perPage);
+                    setTotalPages(newTotalPages);
+                    
+                    // If current page is greater than total pages, reset to page 1
+                    if (currentPage > newTotalPages) {
+                        updateUrlParams(1, searchTerm, filters);
+                    }
                 } else {
                     throw new Error(response.data.error || 'Failed to fetch pets');
                 }
@@ -1601,16 +1676,99 @@ function PetsPage() {
 
         const timeoutId = setTimeout(fetchPets, 300);
         return () => clearTimeout(timeoutId);
-    }, [searchTerm, filters, currentPage, toast]);
+    }, [currentPage, searchTerm, filters, toast, updateUrlParams]);
 
     const handleSearch = (event: React.FormEvent) => {
         event.preventDefault();
-        setCurrentPage(1); // Reset to first page on new search
+        updateUrlParams(1, searchTerm, filters);
     };
 
     const handleFilterChange = (newFilters: PetFiltersState) => {
         setFilters(newFilters);
-        setCurrentPage(1); // Reset to first page on filter change
+        updateUrlParams(1, searchTerm, newFilters);
+    };
+
+    const handlePageChange = (page: number) => {
+        updateUrlParams(page, searchTerm, filters);
+    };
+
+    const handlePetClick = (petId: number) => {
+        navigate(`/pets/${petId}`);
+    };
+
+    // Pagination Component
+    const PaginationControls = () => {
+        const maxVisiblePages = 5;
+        let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+        let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+        if (endPage - startPage + 1 < maxVisiblePages) {
+            startPage = Math.max(1, endPage - maxVisiblePages + 1);
+        }
+
+        return (
+            <div className="flex gap-2">
+                <Button
+                    variant="outline"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1 || loading}
+                >
+                    Previous
+                </Button>
+                
+                {startPage > 1 && (
+                    <>
+                        <Button
+                            variant="outline"
+                            onClick={() => handlePageChange(1)}
+                            className="hidden sm:inline-flex"
+                        >
+                            1
+                        </Button>
+                        {startPage > 2 && <span className="px-2">...</span>}
+                    </>
+                )}
+
+                {Array.from(
+                    { length: endPage - startPage + 1 },
+                    (_, i) => startPage + i
+                ).map((page) => (
+                    <Button
+                        key={page}
+                        variant={currentPage === page ? "default" : "outline"}
+                        onClick={() => handlePageChange(page)}
+                        className="hidden sm:inline-flex"
+                    >
+                        {page}
+                    </Button>
+                ))}
+
+                {endPage < totalPages && (
+                    <>
+                        {endPage < totalPages - 1 && <span className="px-2">...</span>}
+                        <Button
+                            variant="outline"
+                            onClick={() => handlePageChange(totalPages)}
+                            className="hidden sm:inline-flex"
+                        >
+                            {totalPages}
+                        </Button>
+                    </>
+                )}
+
+                <div className="flex items-center px-4 sm:hidden">
+                    Page {currentPage} of {totalPages}
+                </div>
+                
+                <Button
+                    variant="outline"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages || loading}
+                >
+                    Next
+                </Button>
+            </div>
+        );
     };
 
     return (
@@ -1669,7 +1827,11 @@ function PetsPage() {
                 <>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {pets.map((pet) => (
-                            <Card key={pet.pet_id} className="overflow-hidden">
+                            <Card 
+                                key={pet.pet_id} 
+                                className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+                                onClick={() => handlePetClick(pet.pet_id)}
+                            >
                                 <CardHeader>
                                     <CardTitle>{pet.name}</CardTitle>
                                     <CardDescription>
@@ -1679,8 +1841,7 @@ function PetsPage() {
                                 <CardContent>
                                     <p className="text-muted-foreground mb-4">{pet.description}</p>
                                     
-                                    {/* Traits */}
-                                    {Object.entries(pet.traits || {}).map(([category, traits]) => (
+                                    {pet.traits && Object.entries(pet.traits).map(([category, traits]) => (
                                         <div key={category} className="mb-2">
                                             <h4 className="text-sm font-medium text-muted-foreground">
                                                 {category}:
@@ -1698,30 +1859,17 @@ function PetsPage() {
                                         </div>
                                     ))}
                                 </CardContent>
+                                <CardFooter className="justify-end">
+                                    <Button variant="ghost" size="sm">
+                                        View Details <ArrowRight className="ml-2 h-4 w-4" />
+                                    </Button>
+                                </CardFooter>
                             </Card>
                         ))}
                     </div>
 
                     <div className="mt-6 flex justify-center">
-                        <div className="flex gap-2">
-                            <Button
-                                variant="outline"
-                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                disabled={currentPage === 1}
-                            >
-                                Previous
-                            </Button>
-                            <div className="flex items-center px-4">
-                                Page {currentPage} of {totalPages}
-                            </div>
-                            <Button
-                                variant="outline"
-                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                disabled={currentPage === totalPages}
-                            >
-                                Next
-                            </Button>
-                        </div>
+                        <PaginationControls />
                     </div>
                 </>
             )}
@@ -3215,6 +3363,147 @@ export default function ApplicationsPage() {
 ```
 
 
+### File: ./src/pages/profile/FavoritesPage.tsx
+```
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Heart, PawPrint } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { PetCard } from '@/components/pets/PetCard';
+import api from '@/lib/axios';
+
+interface FavoritedPet {
+  pet_id: number;
+  name: string;
+  species: string;
+  breed: string;
+  age: number;
+  gender: string;
+  description: string;
+  shelter_name: string;
+  favorited_at: string;
+  traits?: {
+    [category: string]: string[];
+  };
+}
+
+export default function FavoritesPage() {
+  const [favorites, setFavorites] = useState<FavoritedPet[]>([]);
+  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    fetchFavorites();
+  }, []);
+
+  const fetchFavorites = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/favorites');
+      
+      if (response.data.success) {
+        setFavorites(response.data.data);
+      } else {
+        throw new Error(response.data.error || 'Failed to fetch favorites');
+      }
+    } catch (error: any) {
+      console.error('Error fetching favorites:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to load favorites",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRemoveFavorite = async (petId: number) => {
+    try {
+      await api.delete(`/pets/${petId}/favorite`);
+      setFavorites(favorites.filter(pet => pet.pet_id !== petId));
+      toast({
+        title: "Success",
+        description: "Pet removed from favorites",
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to remove from favorites",
+      });
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="container max-w-4xl mx-auto p-4">
+        <div className="flex justify-center items-center min-h-[400px]">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (favorites.length === 0) {
+    return (
+      <div className="container max-w-4xl mx-auto p-4">
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Heart className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No Favorite Pets Yet</h3>
+            <p className="text-muted-foreground text-center mb-4">
+              Browse our available pets and add some to your favorites!
+            </p>
+            <Button onClick={() => navigate('/pets')}>
+              Browse Pets
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container max-w-4xl mx-auto p-4">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold tracking-tight">Favorite Pets</h1>
+        <p className="text-muted-foreground">
+          Pets you've saved as favorites
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {favorites.map((pet) => (
+          <div key={pet.pet_id} className="relative group">
+            <PetCard
+              pet={pet}
+              onClick={() => navigate(`/pets/${pet.pet_id}`)}
+            />
+            <Button
+              variant="destructive"
+              size="sm"
+              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRemoveFavorite(pet.pet_id);
+              }}
+            >
+              <Heart className="h-4 w-4" /> Remove
+            </Button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+```
+
+
 ### File: ./src/pages/admin/AdminDashboard.tsx
 ```
 import { useEffect, useState } from 'react';
@@ -3829,12 +4118,23 @@ export const removeStoredToken = () => localStorage.removeItem('token');
 
 // User management functions
 export const getStoredUser = (): User | null => {
-  const userStr = localStorage.getItem('user');
-  return userStr ? JSON.parse(userStr) : null;
+  try {
+    const userStr = localStorage.getItem('user');
+    if (!userStr) return null;
+    const user = JSON.parse(userStr);
+    return user;
+  } catch (e) {
+    console.error('Error parsing stored user:', e);
+    return null;
+  }
 };
 
 export const setStoredUser = (user: User) => {
-  localStorage.setItem('user', JSON.stringify(user));
+  try {
+    localStorage.setItem('user', JSON.stringify(user));
+  } catch (e) {
+    console.error('Error storing user:', e);
+  }
 };
 
 export const removeStoredUser = () => {
@@ -4185,6 +4485,8 @@ import ProfileSettings from './pages/profile/ProfileSettings';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 import AdoptionFormPage from './pages/AdoptionFormPage';
 import ApplicationsPage from './pages/profile/ApplicationsPage';
+import FavoritesPage from './pages/profile/FavoritesPage';
+
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -4245,6 +4547,15 @@ function App() {
                 </ProtectedRoute>
               } 
             />
+
+            <Route 
+              path="/profile/favorites" 
+              element={
+                <ProtectedRoute>
+                  <FavoritesPage />
+                </ProtectedRoute>
+              } 
+            />
             
             <Route 
               path="/quiz" 
@@ -4264,7 +4575,6 @@ function App() {
               } 
             />
 
-            {/* Admin Routes */}
             <Route 
               path="/admin/*" 
               element={
@@ -4278,7 +4588,6 @@ function App() {
               }
             />
 
-            {/* Shelter Staff Routes */}
             <Route 
               path="/shelter/*" 
               element={
