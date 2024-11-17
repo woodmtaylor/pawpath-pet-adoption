@@ -6,6 +6,8 @@ import { Progress } from '@/components/ui/progress';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import api from '@/lib/axios';
 
 // Quiz sections and questions
 const quizData = {
@@ -66,8 +68,27 @@ const quizData = {
   ]
 };
 
+interface QuizResults {
+  quiz_id: number;
+  recommendations: {
+    species: string;
+    breed: string | null;
+    traits: Array<{ trait: string; value: string }>;
+  };
+  confidence_score: number;
+  matching_pets: Array<{
+    pet_id: number;
+    name: string;
+    species: string;
+    breed: string;
+    match_score: number;
+    // Add other pet properties as needed
+  }>;
+}
+
 function QuizPage() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [currentSection, setCurrentSection] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -99,11 +120,43 @@ function QuizPage() {
   const handleSubmit = async () => {
     try {
       setIsSubmitting(true);
-      // TODO: Submit answers to backend
-      // const response = await api.post('/quiz/submit', { answers });
-      // navigate('/quiz/results', { state: { results: response.data } });
-    } catch (error) {
+      
+      // Format answers into sections for the API
+      const formattedAnswers = Object.entries(answers).reduce((acc, [questionId, answer]) => {
+        const section = quizData.sections.find(s => 
+          s.questions.some(q => q.id === questionId)
+        );
+        if (section) {
+          if (!acc[section.id]) {
+            acc[section.id] = {};
+          }
+          acc[section.id][questionId] = answer;
+        }
+        return acc;
+      }, {} as Record<string, Record<string, string>>);
+
+      // Submit to the API
+      const response = await api.post<{ success: boolean; data: QuizResults }>('/quiz/submit', {
+        answers: formattedAnswers
+      });
+
+      if (response.data.success) {
+        // Navigate to results page with the quiz results
+        navigate('/quiz/results', { 
+          state: { 
+            results: response.data.data 
+          }
+        });
+      } else {
+        throw new Error('Failed to process quiz results');
+      }
+    } catch (error: any) {
       console.error('Failed to submit quiz:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.response?.data?.error || 'Failed to submit quiz. Please try again.',
+      });
     } finally {
       setIsSubmitting(false);
     }
