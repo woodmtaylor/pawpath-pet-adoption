@@ -19,31 +19,71 @@ class AdoptionService {
         $this->userModel = new User();
     }
     
-    public function createApplication(int $userId, int $petId): array {
-        // Verify user exists
-        $user = $this->userModel->findById($userId);
-        if (!$user) {
-            throw new RuntimeException("User not found");
+
+    public function createApplication(array $data): array {
+        try {
+            // Verify required fields
+            if (!isset($data['user_id']) || !isset($data['pet_id'])) {
+                throw new RuntimeException("User ID and Pet ID are required");
+            }
+
+            // Verify user exists
+            $user = $this->userModel->findById($data['user_id']);
+            if (!$user) {
+                throw new RuntimeException("User not found");
+            }
+            
+            // Verify pet exists
+            $pet = $this->petModel->findById($data['pet_id']);
+            if (!$pet) {
+                throw new RuntimeException("Pet not found");
+            }
+            
+            // Check if user has already applied for this pet
+            if ($this->applicationModel->hasUserAppliedForPet($data['user_id'], $data['pet_id'])) {
+                throw new RuntimeException("You have already applied to adopt this pet");
+            }
+            
+            // Create application with all provided fields
+            $applicationData = [
+                'user_id' => $data['user_id'],
+                'pet_id' => $data['pet_id'],
+                'status' => 'pending',
+                'application_date' => date('Y-m-d'),
+                'reason' => $data['reason'] ?? null,
+                'experience' => $data['experience'] ?? null,
+                'living_situation' => $data['living_situation'] ?? null,
+                'has_other_pets' => $data['has_other_pets'] ?? false,
+                'other_pets_details' => $data['other_pets_details'] ?? null,
+                'daily_schedule' => $data['daily_schedule'] ?? null,
+                'veterinarian' => $data['veterinarian'] ?? null,
+                'status_history' => json_encode([
+                    [
+                        'status' => 'pending',
+                        'date' => date('Y-m-d H:i:s'),
+                        'note' => 'Application submitted'
+                    ]
+                ])
+            ];
+            
+            // Create application
+            $applicationId = $this->applicationModel->create($applicationData);
+            
+            // Get and format the created application
+            $application = $this->applicationModel->findById($applicationId);
+            if (!$application) {
+                throw new RuntimeException("Failed to create application");
+            }
+
+            return [
+                'success' => true,
+                'data' => $application
+            ];
+            
+        } catch (\Exception $e) {
+            error_log("Error in createApplication: " . $e->getMessage());
+            throw $e;
         }
-        
-        // Verify pet exists
-        $pet = $this->petModel->findById($petId);
-        if (!$pet) {
-            throw new RuntimeException("Pet not found");
-        }
-        
-        // Check if user has already applied for this pet
-        if ($this->applicationModel->hasUserAppliedForPet($userId, $petId)) {
-            throw new RuntimeException("You have already applied to adopt this pet");
-        }
-        
-        // Create application
-        $applicationId = $this->applicationModel->create([
-            'user_id' => $userId,
-            'pet_id' => $petId
-        ]);
-        
-        return $this->applicationModel->findById($applicationId);
     }
     
     public function getUserApplications(int $userId): array {

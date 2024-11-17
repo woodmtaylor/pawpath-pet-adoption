@@ -3,6 +3,7 @@
 
 namespace PawPath\api;
 
+use PawPath\utils\ResponseHelper;
 use PawPath\services\AdoptionService;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
@@ -16,47 +17,46 @@ class AdoptionController {
     
     public function submitApplication(Request $request, Response $response): Response {
         try {
-            $userId = $request->getAttribute('user_id'); // From JWT token
+            $userId = $request->getAttribute('user_id');
             $data = $request->getParsedBody();
             
             if (!isset($data['pet_id'])) {
                 throw new \RuntimeException('pet_id is required');
             }
             
-            $result = $this->adoptionService->createApplication(
-                $userId,
-                (int) $data['pet_id']
-            );
+            // Add application details to the database
+            $result = $this->adoptionService->createApplication([
+                'user_id' => $userId,
+                'pet_id' => (int) $data['pet_id'],
+                'reason' => $data['reason'] ?? null,
+                'experience' => $data['experience'] ?? null,
+                'living_situation' => $data['living_situation'] ?? null,
+                'has_other_pets' => $data['has_other_pets'] ?? false,
+                'other_pets_details' => $data['other_pets_details'] ?? null,
+                'daily_schedule' => $data['daily_schedule'] ?? null,
+                'veterinarian' => $data['veterinarian'] ?? null,
+                'status' => 'pending'
+            ]);
             
-            $response->getBody()->write(json_encode($result));
-            return $response->withHeader('Content-Type', 'application/json')
-                           ->withStatus(201);
+            return ResponseHelper::sendResponse($response, $result, 201);
         } catch (\Exception $e) {
-            error_log('Error submitting adoption application: ' . $e->getMessage());
-            
-            $response->getBody()->write(json_encode([
-                'error' => $e->getMessage()
-            ]));
-            return $response->withHeader('Content-Type', 'application/json')
-                           ->withStatus(400);
+            return ResponseHelper::sendError(
+                $response, 
+                $e->getMessage(),
+                400
+            );
         }
     }
     
     public function getUserApplications(Request $request, Response $response): Response {
         try {
-            $userId = $request->getAttribute('user_id'); // From JWT token
-            $result = $this->adoptionService->getUserApplications($userId);
+            $userId = $request->getAttribute('user_id');
+            $applications = $this->adoptionService->getUserApplications($userId);
             
-            $response->getBody()->write(json_encode($result));
-            return $response->withHeader('Content-Type', 'application/json');
+            return ResponseHelper::sendResponse($response, $applications);
         } catch (\Exception $e) {
             error_log('Error getting user applications: ' . $e->getMessage());
-            
-            $response->getBody()->write(json_encode([
-                'error' => $e->getMessage()
-            ]));
-            return $response->withHeader('Content-Type', 'application/json')
-                           ->withStatus(400);
+            return ResponseHelper::sendError($response, $e->getMessage());
         }
     }
     

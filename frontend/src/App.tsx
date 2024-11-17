@@ -16,6 +16,7 @@ import ProfilePage from './pages/ProfilePage';
 import ProfileSettings from './pages/profile/ProfileSettings';
 import UnauthorizedPage from './pages/UnauthorizedPage';
 import AdoptionFormPage from './pages/AdoptionFormPage';
+import ApplicationsPage from './pages/profile/ApplicationsPage';
 
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -64,6 +65,15 @@ function App() {
               element={
                 <ProtectedRoute>
                   <ProfileSettings />
+                </ProtectedRoute>
+              } 
+            />
+
+            <Route 
+              path="/profile/applications" 
+              element={
+                <ProtectedRoute>
+                  <ApplicationsPage />
                 </ProtectedRoute>
               } 
             />
