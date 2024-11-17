@@ -1,6 +1,5 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { profileService } from '@/services/profile';
 
 interface RoleProtectedRouteProps {
   children: React.ReactNode;
@@ -19,7 +18,17 @@ export function RoleProtectedRoute({ children, requiredRole }: RoleProtectedRout
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (!profileService.hasPermission(requiredRole)) {
+  // Check role authorization
+  const roleHierarchy = {
+    'admin': ['admin'],
+    'shelter_staff': ['admin', 'shelter_staff'],
+    'adopter': ['admin', 'shelter_staff', 'adopter']
+  };
+
+  const userRole = user?.role || 'adopter';
+  const allowedRoles = roleHierarchy[requiredRole] || [];
+
+  if (!allowedRoles.includes(userRole)) {
     return <Navigate to="/unauthorized" replace />;
   }
 

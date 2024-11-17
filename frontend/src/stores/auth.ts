@@ -18,12 +18,23 @@ export const removeStoredToken = () => localStorage.removeItem('token');
 
 // User management functions
 export const getStoredUser = (): User | null => {
-  const userStr = localStorage.getItem('user');
-  return userStr ? JSON.parse(userStr) : null;
+  try {
+    const userStr = localStorage.getItem('user');
+    if (!userStr) return null;
+    const user = JSON.parse(userStr);
+    return user;
+  } catch (e) {
+    console.error('Error parsing stored user:', e);
+    return null;
+  }
 };
 
 export const setStoredUser = (user: User) => {
-  localStorage.setItem('user', JSON.stringify(user));
+  try {
+    localStorage.setItem('user', JSON.stringify(user));
+  } catch (e) {
+    console.error('Error storing user:', e);
+  }
 };
 
 export const removeStoredUser = () => {

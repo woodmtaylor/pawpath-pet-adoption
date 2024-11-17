@@ -1,13 +1,10 @@
 <?php
-// backend/src/api/AuthController.php
-
 namespace PawPath\api;
 
 use PawPath\services\AuthService;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use PawPath\utils\ResponseHelper;
-use PawPath\services\EmailService;
 
 class AuthController {
     private AuthService $authService;
@@ -15,7 +12,7 @@ class AuthController {
     public function __construct() {
         $this->authService = new AuthService();
     }
-    
+
     public function register(Request $request, Response $response): Response {
         try {
             $data = $request->getParsedBody();
@@ -26,11 +23,29 @@ class AuthController {
             }
             
             $result = $this->authService->register($data);
+            
+            // Try to send verification email
+            try {
+                $emailService = new EmailService();
+                $emailService->sendVerificationEmail(
+                    $data['email'],
+                    $data['username'],
+                    $result['user']['email_verification_token']
+                );
+            } catch (\Exception $e) {
+                // Log email error but don't fail registration
+                error_log('Failed to send verification email: ' . $e->getMessage());
+            }
+            
             return ResponseHelper::sendResponse($response, $result, 201);
             
         } catch (\Exception $e) {
             error_log('Registration error: ' . $e->getMessage());
-            return ResponseHelper::sendError($response, $e->getMessage(), 400);
+            return ResponseHelper::sendError(
+                $response, 
+                $e->getMessage(), 
+                $e instanceof RuntimeException ? 400 : 500
+            );
         }
     }
     
@@ -48,34 +63,34 @@ class AuthController {
             
         } catch (\Exception $e) {
             error_log('Login error: ' . $e->getMessage());
-            return ResponseHelper::sendError($response, 'Invalid credentials', 401);
+            error_log('Stack trace: ' . $e->getTraceAsString());
+            return ResponseHelper::sendError(
+                $response, 
+                'An error occurred during login. Please try again.', 
+                500
+            );
         }
     }
 
     public function getCurrentUser(Request $request, Response $response): Response {
         try {
             $userId = $request->getAttribute('user_id');
-            $user = $this->userModel->findById($userId);
+            $user = $this->authService->getUser($userId);
             
             if (!$user) {
-                throw new RuntimeException('User not found');
+                throw new \RuntimeException('User not found');
             }
             
-            // Remove sensitive data
-            unset($user['password_hash']);
-            
-            $response->getBody()->write(json_encode([
+            return ResponseHelper::sendResponse($response, [
                 'user' => $user
-            ]));
-            return $response->withHeader('Content-Type', 'application/json');
-            
-        } catch (Exception $e) {
-            $response->getBody()->write(json_encode([
-                'error' => $e->getMessage()
-            ]));
-            return $response
-                ->withHeader('Content-Type', 'application/json')
-                ->withStatus(401);
+            ]);
+        } catch (\Exception $e) {
+            error_log('Error getting current user: ' . $e->getMessage());
+            return ResponseHelper::sendError(
+                $response, 
+                'Failed to get user information', 
+                500
+            );
         }
     }
 
@@ -87,54 +102,31 @@ class AuthController {
                 return ResponseHelper::sendError($response, 'Verification token is required', 400);
             }
             
-            $user = $this->authService->verifyEmailToken($data['token']);
-            
-            if (!$user) {
-                return ResponseHelper::sendError($response, 'Invalid or expired verification token', 400);
-            }
-            
+            $result = $this->authService->verifyEmailToken($data['token']);
             return ResponseHelper::sendResponse($response, [
                 'message' => 'Email verified successfully'
             ]);
-            
         } catch (\Exception $e) {
-            return ResponseHelper::sendError($response, $e->getMessage(), 400);
+            error_log('Email verification error: ' . $e->getMessage());
+            return ResponseHelper::sendError($response, 'Failed to verify email', 500);
         }
     }
 
     public function resendVerification(Request $request, Response $response): Response {
         try {
             $userId = $request->getAttribute('user_id');
-            $user = $this->authService->getUser($userId);
-            
-            if (!$user) {
-                return ResponseHelper::sendError($response, 'User not found', 404);
-            }
-            
-            if ($user['email_verified_at']) {
-                return ResponseHelper::sendError($response, 'Email already verified', 400);
-            }
-            
-            $token = $this->authService->createEmailVerificationToken($userId);
-            
-            $emailService = new EmailService();
-            $emailSent = $emailService->sendVerificationEmail(
-                $user['email'],
-                $user['username'],
-                $token
-            );
-            
-            if (!$emailSent) {
-                return ResponseHelper::sendError($response, 'Failed to send verification email', 500);
-            }
+            $result = $this->authService->resendVerificationEmail($userId);
             
             return ResponseHelper::sendResponse($response, [
                 'message' => 'Verification email sent successfully'
             ]);
-            
         } catch (\Exception $e) {
-            return ResponseHelper::sendError($response, $e->getMessage(), 500);
+            error_log('Resend verification error: ' . $e->getMessage());
+            return ResponseHelper::sendError(
+                $response, 
+                'Failed to resend verification email', 
+                500
+            );
         }
-
     }
 }

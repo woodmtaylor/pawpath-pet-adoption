@@ -107,7 +107,6 @@ function App() {
               } 
             />
 
-            {/* Admin Routes */}
             <Route 
               path="/admin/*" 
               element={
@@ -121,7 +120,6 @@ function App() {
               }
             />
 
-            {/* Shelter Staff Routes */}
             <Route 
               path="/shelter/*" 
               element={

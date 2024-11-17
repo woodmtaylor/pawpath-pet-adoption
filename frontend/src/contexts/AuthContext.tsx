@@ -27,11 +27,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useAtom(userAtom);
   const [isLoading, setIsLoading] = useAtom(authLoadingAtom);
 
-  // Setup axios interceptor for token expiration
+  // Set up axios interceptor for authentication
   useEffect(() => {
-    const interceptor = api.interceptors.response.use(
-      (response) => response,
+    const token = getStoredToken();
+    if (token) {
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    }
+
+    // Add request interceptor
+    const requestInterceptor = api.interceptors.request.use(
+      (config) => {
+        const token = getStoredToken();
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+      },
       (error) => {
+        return Promise.reject(error);
+      }
+    );
+
+    // Add response interceptor
+    const responseInterceptor = api.interceptors.response.use(
+      (response) => response,
+      async (error) => {
         if (error.response?.status === 401) {
           // Token expired or invalid
           logout();
@@ -41,7 +61,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
 
     return () => {
-      api.interceptors.response.eject(interceptor);
+      // Clean up interceptors
+      api.interceptors.request.eject(requestInterceptor);
+      api.interceptors.response.eject(responseInterceptor);
     };
   }, []);
 
@@ -54,15 +76,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const storedUser = getStoredUser();
         
         if (token && storedUser) {
-          // Set default authorization header
           api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
           
           try {
-            // Verify token is still valid with backend
+            // Verify token with backend
             const response = await api.get('/auth/me');
             const userData = response.data.user;
             
-            // Update stored user data if different
             if (JSON.stringify(userData) !== JSON.stringify(storedUser)) {
               setStoredUser(userData);
               setUser(userData);
@@ -70,12 +90,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setUser(storedUser);
             }
           } catch (error) {
-            // If verification fails, clear auth state
             console.error('Token verification failed:', error);
             logout();
           }
         } else {
-          // No stored auth data
           logout();
         }
       } catch (error) {
@@ -87,48 +105,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     initializeAuth();
-  }, [setUser, setIsLoading]);
-
-  const login = async (email: string, password: string) => {
-      try {
-          const response = await api.post('/auth/login', { email, password });
-          const { token, user } = response.data.data;
-          
-          // Store token
-          setStoredToken(token);
-          
-          // Update axios default header
-          api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-          
-          // Store user
-          setStoredUser(user);
-          setUser(user);
-          
-          // Log for debugging
-          console.log('Login successful, token stored');
-      } catch (error) {
-          console.error('Login error:', error);
-          throw error;
-      }
-  };
-
-  useEffect(() => {
-    const token = getStoredToken();
-    if (token) {
-        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        console.log('Token restored from storage');
-      }
   }, []);
 
+  const login = async (email: string, password: string) => {
+    try {
+      const response = await api.post('/auth/login', { email, password });
+      const { token, user: userData } = response.data.data;
+      
+      setStoredToken(token);
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      setStoredUser(userData);
+      setUser(userData);
+      
+      console.log('Login successful, user:', userData);
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    }
+  };
+
   const logout = () => {
-    // Clear stored auth data
     removeStoredToken();
     removeStoredUser();
-    
-    // Clear axios default header
     delete api.defaults.headers.common['Authorization'];
-    
-    // Reset state
     setUser(null);
   };
 

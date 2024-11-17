@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PetFilters } from '@/components/pets/PetFilters';
 import { Button } from '@/components/ui/button';
@@ -37,34 +37,42 @@ function PetsPage() {
     const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
     const [filters, setFilters] = useState<PetFiltersState>({});
     const [availableTraits, setAvailableTraits] = useState<string[]>([]);
-    const [currentPage, setCurrentPage] = useState(parseInt(searchParams.get('page') || '1'));
     const [totalPages, setTotalPages] = useState(1);
-    const perPage = 12;
     const { toast } = useToast();
     const { isAuthenticated } = useAuth();
 
+    // Get current page from URL
+    const currentPage = parseInt(searchParams.get('page') || '1', 10);
+    const perPage = 12;
+
+    const updateUrlParams = useCallback((page: number, search: string, currentFilters: PetFiltersState) => {
+        const newParams = new URLSearchParams();
+        
+        if (page > 1) newParams.set('page', page.toString());
+        if (search) newParams.set('search', search);
+        
+        // Add filters to URL if they exist
+        Object.entries(currentFilters).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+                if (Array.isArray(value)) {
+                    value.forEach(v => newParams.append(key, v));
+                } else {
+                    newParams.set(key, value.toString());
+                }
+            }
+        });
+
+        setSearchParams(newParams);
+    }, [setSearchParams]);
+
+    // Authentication check
     useEffect(() => {
         if (!isAuthenticated) {
             navigate('/login', { state: { from: '/pets' } });
         }
     }, [isAuthenticated, navigate]);
 
-    useEffect(() => {
-        // Update URL with current page and search term
-        const newSearchParams = new URLSearchParams(searchParams);
-        if (currentPage !== 1) {
-            newSearchParams.set('page', currentPage.toString());
-        } else {
-            newSearchParams.delete('page');
-        }
-        if (searchTerm) {
-            newSearchParams.set('search', searchTerm);
-        } else {
-            newSearchParams.delete('search');
-        }
-        setSearchParams(newSearchParams);
-    }, [currentPage, searchTerm]);
-
+    // Fetch available traits
     useEffect(() => {
         const fetchTraits = async () => {
             try {
@@ -78,6 +86,7 @@ function PetsPage() {
         fetchTraits();
     }, []);
 
+    // Fetch pets with debounce
     useEffect(() => {
         const fetchPets = async () => {
             try {
@@ -95,11 +104,12 @@ function PetsPage() {
 
                 if (response.data.success) {
                     setPets(response.data.data.items);
-                    setTotalPages(Math.ceil(response.data.data.total / perPage));
+                    const newTotalPages = Math.ceil(response.data.data.total / perPage);
+                    setTotalPages(newTotalPages);
                     
                     // If current page is greater than total pages, reset to page 1
-                    if (currentPage > Math.ceil(response.data.data.total / perPage)) {
-                        setCurrentPage(1);
+                    if (currentPage > newTotalPages) {
+                        updateUrlParams(1, searchTerm, filters);
                     }
                 } else {
                     throw new Error(response.data.error || 'Failed to fetch pets');
@@ -119,20 +129,99 @@ function PetsPage() {
 
         const timeoutId = setTimeout(fetchPets, 300);
         return () => clearTimeout(timeoutId);
-    }, [searchTerm, filters, currentPage, toast]);
+    }, [currentPage, searchTerm, filters, toast, updateUrlParams]);
 
     const handleSearch = (event: React.FormEvent) => {
         event.preventDefault();
-        setCurrentPage(1);
+        updateUrlParams(1, searchTerm, filters);
     };
 
     const handleFilterChange = (newFilters: PetFiltersState) => {
         setFilters(newFilters);
-        setCurrentPage(1);
+        updateUrlParams(1, searchTerm, newFilters);
+    };
+
+    const handlePageChange = (page: number) => {
+        updateUrlParams(page, searchTerm, filters);
     };
 
     const handlePetClick = (petId: number) => {
         navigate(`/pets/${petId}`);
+    };
+
+    // Pagination Component
+    const PaginationControls = () => {
+        const maxVisiblePages = 5;
+        let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+        let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+        if (endPage - startPage + 1 < maxVisiblePages) {
+            startPage = Math.max(1, endPage - maxVisiblePages + 1);
+        }
+
+        return (
+            <div className="flex gap-2">
+                <Button
+                    variant="outline"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1 || loading}
+                >
+                    Previous
+                </Button>
+                
+                {startPage > 1 && (
+                    <>
+                        <Button
+                            variant="outline"
+                            onClick={() => handlePageChange(1)}
+                            className="hidden sm:inline-flex"
+                        >
+                            1
+                        </Button>
+                        {startPage > 2 && <span className="px-2">...</span>}
+                    </>
+                )}
+
+                {Array.from(
+                    { length: endPage - startPage + 1 },
+                    (_, i) => startPage + i
+                ).map((page) => (
+                    <Button
+                        key={page}
+                        variant={currentPage === page ? "default" : "outline"}
+                        onClick={() => handlePageChange(page)}
+                        className="hidden sm:inline-flex"
+                    >
+                        {page}
+                    </Button>
+                ))}
+
+                {endPage < totalPages && (
+                    <>
+                        {endPage < totalPages - 1 && <span className="px-2">...</span>}
+                        <Button
+                            variant="outline"
+                            onClick={() => handlePageChange(totalPages)}
+                            className="hidden sm:inline-flex"
+                        >
+                            {totalPages}
+                        </Button>
+                    </>
+                )}
+
+                <div className="flex items-center px-4 sm:hidden">
+                    Page {currentPage} of {totalPages}
+                </div>
+                
+                <Button
+                    variant="outline"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages || loading}
+                >
+                    Next
+                </Button>
+            </div>
+        );
     };
 
     return (
@@ -205,8 +294,7 @@ function PetsPage() {
                                 <CardContent>
                                     <p className="text-muted-foreground mb-4">{pet.description}</p>
                                     
-                                    {/* Traits */}
-                                    {Object.entries(pet.traits || {}).map(([category, traits]) => (
+                                    {pet.traits && Object.entries(pet.traits).map(([category, traits]) => (
                                         <div key={category} className="mb-2">
                                             <h4 className="text-sm font-medium text-muted-foreground">
                                                 {category}:
@@ -234,35 +322,7 @@ function PetsPage() {
                     </div>
 
                     <div className="mt-6 flex justify-center">
-                        <div className="flex gap-2">
-                            <Button
-                                variant="outline"
-                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                disabled={currentPage === 1}
-                            >
-                                Previous
-                            </Button>
-                            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                                <Button
-                                    key={page}
-                                    variant={currentPage === page ? "default" : "outline"}
-                                    onClick={() => setCurrentPage(page)}
-                                    className="hidden sm:inline-flex"
-                                >
-                                    {page}
-                                </Button>
-                            ))}
-                            <div className="flex items-center px-4 sm:hidden">
-                                Page {currentPage} of {totalPages}
-                            </div>
-                            <Button
-                                variant="outline"
-                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                disabled={currentPage === totalPages}
-                            >
-                                Next
-                            </Button>
-                        </div>
+                        <PaginationControls />
                     </div>
                 </>
             )}
