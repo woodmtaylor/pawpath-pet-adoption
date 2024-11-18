@@ -1,5 +1,5 @@
 # PawPath Pet Adoption Frontend Codebase
-Generated on Sun Nov 17 17:05:28 CST 2024
+Generated on Sun Nov 17 21:49:17 CST 2024
 
 
 
@@ -570,157 +570,158 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useAtom } from 'jotai';
 import { 
-  userAtom, 
-  authLoadingAtom,
-  getStoredToken,
-  setStoredToken,
-  removeStoredToken,
-  getStoredUser,
-  setStoredUser,
-  removeStoredUser,
-  User 
+    userAtom, 
+    authLoadingAtom,
+    getStoredToken,
+    setStoredToken,
+    removeStoredToken,
+    getStoredUser,
+    setStoredUser,
+    removeStoredUser,
+    User 
 } from '@/stores/auth';
 import api from '@/lib/axios';
 
 interface AuthContextType {
-  isAuthenticated: boolean;
-  user: User | null;
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
-  isLoading: boolean;
+    isAuthenticated: boolean;
+    user: User | null;
+    login: (email: string, password: string) => Promise<void>;
+    logout: () => void;
+    isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useAtom(userAtom);
-  const [isLoading, setIsLoading] = useAtom(authLoadingAtom);
+    const [user, setUser] = useAtom(userAtom);
+    const [isLoading, setIsLoading] = useAtom(authLoadingAtom);
 
-  // Set up axios interceptor for authentication
-  useEffect(() => {
-    const token = getStoredToken();
-    if (token) {
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    }
-
-    // Add request interceptor
-    const requestInterceptor = api.interceptors.request.use(
-      (config) => {
+    // Set up axios interceptor for authentication
+    useEffect(() => {
         const token = getStoredToken();
         if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
+            api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         }
-        return config;
-      },
-      (error) => {
-        return Promise.reject(error);
-      }
-    );
 
-    // Add response interceptor
-    const responseInterceptor = api.interceptors.response.use(
-      (response) => response,
-      async (error) => {
-        if (error.response?.status === 401) {
-          // Token expired or invalid
-          logout();
-        }
-        return Promise.reject(error);
-      }
-    );
-
-    return () => {
-      // Clean up interceptors
-      api.interceptors.request.eject(requestInterceptor);
-      api.interceptors.response.eject(responseInterceptor);
-    };
-  }, []);
-
-  // Initialize auth state from localStorage
-  useEffect(() => {
-    const initializeAuth = async () => {
-      try {
-        setIsLoading(true);
-        const token = getStoredToken();
-        const storedUser = getStoredUser();
-        
-        if (token && storedUser) {
-          api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-          
-          try {
-            // Verify token with backend
-            const response = await api.get('/auth/me');
-            const userData = response.data.user;
-            
-            if (JSON.stringify(userData) !== JSON.stringify(storedUser)) {
-              setStoredUser(userData);
-              setUser(userData);
-            } else {
-              setUser(storedUser);
+        // Add request interceptor
+        const requestInterceptor = api.interceptors.request.use(
+            (config) => {
+                const token = getStoredToken();
+                if (token) {
+                    config.headers.Authorization = `Bearer ${token}`;
+                }
+                return config;
+            },
+            (error) => {
+                return Promise.reject(error);
             }
-          } catch (error) {
-            console.error('Token verification failed:', error);
-            logout();
-          }
-        } else {
-          logout();
+        );
+
+        // Add response interceptor
+        const responseInterceptor = api.interceptors.response.use(
+            (response) => response,
+            async (error) => {
+                if (error.response?.status === 401) {
+                    // Token expired or invalid
+                    logout();
+                }
+                return Promise.reject(error);
+            }
+        );
+
+        return () => {
+            // Clean up interceptors
+            api.interceptors.request.eject(requestInterceptor);
+            api.interceptors.response.eject(responseInterceptor);
+        };
+    }, []);
+
+    // Initialize auth state from localStorage
+    useEffect(() => {
+        const initializeAuth = async () => {
+            try {
+                setIsLoading(true);
+                const token = getStoredToken();
+                const storedUser = getStoredUser();
+                
+                if (!token) {
+                    setIsLoading(false);
+                    return;
+                }
+
+                api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+                
+                try {
+                    // Verify token with backend
+                    const response = await api.get('/auth/me');
+                    const userData = response.data.data.user;
+                    
+                    if (JSON.stringify(userData) !== JSON.stringify(storedUser)) {
+                        setStoredUser(userData);
+                        setUser(userData);
+                    } else {
+                        setUser(storedUser);
+                    }
+                } catch (error) {
+                    console.error('Token verification failed:', error);
+                    logout();
+                }
+            } catch (error) {
+                console.error('Auth initialization error:', error);
+                logout();
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        initializeAuth();
+    }, []);
+
+    const login = async (email: string, password: string) => {
+        try {
+            const response = await api.post('/auth/login', { email, password });
+            const { token, user: userData } = response.data.data;
+            
+            setStoredToken(token);
+            api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+            setStoredUser(userData);
+            setUser(userData);
+            
+            console.log('Login successful, user:', userData);
+        } catch (error) {
+            console.error('Login error:', error);
+            throw error;
         }
-      } catch (error) {
-        console.error('Auth initialization error:', error);
-        logout();
-      } finally {
-        setIsLoading(false);
-      }
     };
 
-    initializeAuth();
-  }, []);
+    const logout = () => {
+        removeStoredToken();
+        removeStoredUser();
+        delete api.defaults.headers.common['Authorization'];
+        setUser(null);
+    };
 
-  const login = async (email: string, password: string) => {
-    try {
-      const response = await api.post('/auth/login', { email, password });
-      const { token, user: userData } = response.data.data;
-      
-      setStoredToken(token);
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      setStoredUser(userData);
-      setUser(userData);
-      
-      console.log('Login successful, user:', userData);
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error;
-    }
-  };
-
-  const logout = () => {
-    removeStoredToken();
-    removeStoredUser();
-    delete api.defaults.headers.common['Authorization'];
-    setUser(null);
-  };
-
-  return (
-    <AuthContext.Provider 
-      value={{ 
-        isAuthenticated: !!user, 
-        user, 
-        login, 
-        logout,
-        isLoading 
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+    return (
+        <AuthContext.Provider 
+            value={{ 
+                isAuthenticated: !!user, 
+                user, 
+                login, 
+                logout,
+                isLoading 
+            }}
+        >
+            {children}
+        </AuthContext.Provider>
+    );
 }
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+    const context = useContext(AuthContext);
+    if (context === undefined) {
+        throw new Error('useAuth must be used within an AuthProvider');
+    }
+    return context;
 };
 
 ```
@@ -1588,29 +1589,34 @@ function PetsPage() {
     const { toast } = useToast();
     const { isAuthenticated } = useAuth();
 
-    // Get current page from URL
     const currentPage = parseInt(searchParams.get('page') || '1', 10);
     const perPage = 12;
 
     const updateUrlParams = useCallback((page: number, search: string, currentFilters: PetFiltersState) => {
-        const newParams = new URLSearchParams();
+        const newParams = new URLSearchParams(searchParams);
         
         if (page > 1) newParams.set('page', page.toString());
-        if (search) newParams.set('search', search);
+        else newParams.delete('page');
         
-        // Add filters to URL if they exist
+        if (search) newParams.set('search', search);
+        else newParams.delete('search');
+        
+        // Handle filters
         Object.entries(currentFilters).forEach(([key, value]) => {
             if (value !== undefined && value !== null && value !== '') {
                 if (Array.isArray(value)) {
+                    newParams.delete(key);
                     value.forEach(v => newParams.append(key, v));
                 } else {
                     newParams.set(key, value.toString());
                 }
+            } else {
+                newParams.delete(key);
             }
         });
 
         setSearchParams(newParams);
-    }, [setSearchParams]);
+    }, [setSearchParams, searchParams]);
 
     // Authentication check
     useEffect(() => {
@@ -1633,17 +1639,20 @@ function PetsPage() {
         fetchTraits();
     }, []);
 
-    // Fetch pets with debounce
+    // Fetch pets with pagination
     useEffect(() => {
         const fetchPets = async () => {
             try {
                 setLoading(true);
                 setError(null);
 
+                const offset = (currentPage - 1) * perPage;
+
                 const response = await api.get<ApiResponse<PaginatedResponse>>('/pets', { 
                     params: {
                         page: currentPage,
                         perPage,
+                        offset,
                         search: searchTerm,
                         ...filters
                     }
@@ -1654,8 +1663,7 @@ function PetsPage() {
                     const newTotalPages = Math.ceil(response.data.data.total / perPage);
                     setTotalPages(newTotalPages);
                     
-                    // If current page is greater than total pages, reset to page 1
-                    if (currentPage > newTotalPages) {
+                    if (currentPage > newTotalPages && newTotalPages > 0) {
                         updateUrlParams(1, searchTerm, filters);
                     }
                 } else {
@@ -1674,9 +1682,11 @@ function PetsPage() {
             }
         };
 
-        const timeoutId = setTimeout(fetchPets, 300);
-        return () => clearTimeout(timeoutId);
-    }, [currentPage, searchTerm, filters, toast, updateUrlParams]);
+        if (isAuthenticated) {
+            const timeoutId = setTimeout(fetchPets, 300);
+            return () => clearTimeout(timeoutId);
+        }
+    }, [currentPage, searchTerm, filters, toast, updateUrlParams, isAuthenticated]);
 
     const handleSearch = (event: React.FormEvent) => {
         event.preventDefault();
@@ -3504,130 +3514,428 @@ export default function FavoritesPage() {
 ```
 
 
+### File: ./src/pages/admin/NewShelterPage.tsx
+```
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import api from '@/lib/axios';
+
+interface ShelterFormData {
+    name: string;
+    address: string;
+    phone: string;
+    email: string;
+    is_no_kill: boolean;
+}
+
+export default function NewShelterPage() {
+    const [formData, setFormData] = useState<ShelterFormData>({
+        name: '',
+        address: '',
+        phone: '',
+        email: '',
+        is_no_kill: false
+    });
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const { toast } = useToast();
+    const navigate = useNavigate();
+    const { user } = useAuth();
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        
+        try {
+            setIsSubmitting(true);
+            const response = await api.post('/admin/shelters', formData);
+            
+            if (response.data.success) {
+                toast({
+                    title: "Success",
+                    description: "Shelter created successfully"
+                });
+                navigate('/admin/shelters');
+            } else {
+                throw new Error(response.data.error || 'Failed to create shelter');
+            }
+        } catch (error: any) {
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: error.response?.data?.error || "Failed to create shelter"
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value, type, checked } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: type === 'checkbox' ? checked : value
+        }));
+    };
+
+    return (
+        <div className="container max-w-2xl mx-auto p-6">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Add New Shelter</CardTitle>
+                    <CardDescription>
+                        Create a new animal shelter in the system
+                    </CardDescription>
+                </CardHeader>
+
+                <form onSubmit={handleSubmit}>
+                    <CardContent className="space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="name">Shelter Name</Label>
+                            <Input
+                                id="name"
+                                name="name"
+                                placeholder="Enter shelter name"
+                                required
+                                value={formData.name}
+                                onChange={handleChange}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="address">Address</Label>
+                            <Input
+                                id="address"
+                                name="address"
+                                placeholder="Enter full address"
+                                required
+                                value={formData.address}
+                                onChange={handleChange}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="phone">Phone Number</Label>
+                            <Input
+                                id="phone"
+                                name="phone"
+                                placeholder="Enter phone number"
+                                required
+                                value={formData.phone}
+                                onChange={handleChange}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="email">Email</Label>
+                            <Input
+                                id="email"
+                                name="email"
+                                type="email"
+                                placeholder="Enter email address"
+                                required
+                                value={formData.email}
+                                onChange={handleChange}
+                            />
+                        </div>
+
+                        <div className="flex items-center space-x-2">
+                            <Checkbox
+                                id="is_no_kill"
+                                name="is_no_kill"
+                                checked={formData.is_no_kill}
+                                onCheckedChange={(checked) => 
+                                    setFormData(prev => ({ ...prev, is_no_kill: checked as boolean }))
+                                }
+                            />
+                            <Label htmlFor="is_no_kill">This is a no-kill shelter</Label>
+                        </div>
+                    </CardContent>
+
+                    <CardFooter className="flex justify-between">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => navigate('/admin/shelters')}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            disabled={isSubmitting}
+                        >
+                            {isSubmitting ? 'Creating...' : 'Create Shelter'}
+                        </Button>
+                    </CardFooter>
+                </form>
+            </Card>
+        </div>
+    );
+}
+
+```
+
+
 ### File: ./src/pages/admin/AdminDashboard.tsx
 ```
 import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Link } from 'react-router-dom';
-import { Users, Building2, PawPrint, FileText } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { 
+    PawPrint, 
+    FileText, 
+    Users, 
+    Plus, 
+    Building2, 
+    TrendingUp, 
+    AlertTriangle 
+} from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/axios';
 
 interface DashboardStats {
-  totalUsers: number;
-  totalShelters: number;
-  totalPets: number;
-  totalApplications: number;
+    totalUsers: number;
+    totalShelters: number;
+    totalPets: number;
+    totalApplications: number;
+    pendingApplications: number;
+    activeUsers: number;
+    recentActivity: Array<{
+        id: number;
+        type: string;
+        message: string;
+        timestamp: string;
+    }>;
 }
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState<DashboardStats>({
-    totalUsers: 0,
-    totalShelters: 0,
-    totalPets: 0,
-    totalApplications: 0
-  });
+    const [stats, setStats] = useState<DashboardStats>({
+        totalUsers: 0,
+        totalShelters: 0,
+        totalPets: 0,
+        totalApplications: 0,
+        pendingApplications: 0,
+        activeUsers: 0,
+        recentActivity: []
+    });
 
-  const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(true);
+    const { toast } = useToast();
+    const { user, isAuthenticated } = useAuth();
+    const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const response = await api.get('/admin/stats');
-        setStats(response.data.data);
-      } catch (error) {
-        console.error('Failed to fetch admin stats:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+    useEffect(() => {
+        // Check if user is authenticated and has admin role
+        if (!isAuthenticated || user?.role !== 'admin') {
+            toast({
+                variant: "destructive",
+                title: "Unauthorized Access",
+                description: "You don't have permission to view this page."
+            });
+            navigate('/unauthorized');
+            return;
+        }
 
-    fetchStats();
-  }, []);
+        const fetchStats = async () => {
+            try {
+                setLoading(true);
+                const response = await api.get('/admin/stats');
+                if (response.data.success) {
+                    setStats(response.data.data);
+                } else {
+                    throw new Error(response.data.error || 'Failed to fetch stats');
+                }
+            } catch (error) {
+                console.error('Failed to fetch admin stats:', error);
+                toast({
+                    variant: "destructive",
+                    title: "Error",
+                    description: "Failed to load dashboard statistics"
+                });
+            } finally {
+                setLoading(false);
+            }
+        };
 
-  const StatCard = ({ title, value, icon: Icon, href }: { 
-    title: string;
-    value: number;
-    icon: any;
-    href: string;
-  }) => (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">
-          {title}
-        </CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground" />
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        <Button asChild variant="link" className="p-0">
-          <Link to={href}>View Details</Link>
-        </Button>
-      </CardContent>
-    </Card>
-  );
+        fetchStats();
+    }, [isAuthenticated, user, navigate, toast]);
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="container mx-auto p-6">
-      <div className="space-y-4">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Admin Dashboard</h2>
-          <p className="text-muted-foreground">
-            Overview of system statistics and management options
-          </p>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            title="Total Users"
-            value={stats.totalUsers}
-            icon={Users}
-            href="/admin/users"
-          />
-          <StatCard
-            title="Shelters"
-            value={stats.totalShelters}
-            icon={Building2}
-            href="/admin/shelters"
-          />
-          <StatCard
-            title="Pets Listed"
-            value={stats.totalPets}
-            icon={PawPrint}
-            href="/admin/pets"
-          />
-          <StatCard
-            title="Adoption Applications"
-            value={stats.totalApplications}
-            icon={FileText}
-            href="/admin/applications"
-          />
-        </div>
-
-        {/* Recent Activity Section */}
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>
-              Latest system updates and changes
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {/* Add recent activity content here */}
-          </CardContent>
+    const StatCard = ({ 
+        title, 
+        value, 
+        icon: Icon, 
+        description, 
+        href, 
+        trend 
+    }: { 
+        title: string;
+        value: number;
+        icon: any;
+        description?: string;
+        href: string;
+        trend?: {
+            value: number;
+            label: string;
+        };
+    }) => (
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium">{title}</CardTitle>
+                <Icon className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <div className="text-2xl font-bold">{value}</div>
+                        {description && (
+                            <p className="text-xs text-muted-foreground">{description}</p>
+                        )}
+                    </div>
+                    {trend && (
+                        <div className={`text-xs ${trend.value >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                            <TrendingUp className="h-3 w-3 inline mr-1" />
+                            {trend.value}% {trend.label}
+                        </div>
+                    )}
+                </div>
+                <Button asChild variant="link" className="p-0 mt-2">
+                    <Link to={href}>View Details</Link>
+                </Button>
+            </CardContent>
         </Card>
-      </div>
-    </div>
-  );
+    );
+
+    if (loading) {
+        return (
+            <div className="flex justify-center items-center min-h-screen">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="container mx-auto p-6">
+            <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                    <div>
+                        <h2 className="text-3xl font-bold tracking-tight">Admin Dashboard</h2>
+                        <p className="text-muted-foreground">
+                            Welcome back, {user?.username}. Here's what's happening with your platform.
+                        </p>
+                    </div>
+                    <Button asChild>
+                        <Link to="/admin/shelters/new">
+                            <Plus className="mr-2 h-4 w-4" />
+                            Add New Shelter
+                        </Link>
+                    </Button>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    <StatCard
+                        title="Total Users"
+                        value={stats.totalUsers}
+                        icon={Users}
+                        description="Active platform users"
+                        href="/admin/users"
+                        trend={{ value: 12, label: 'this month' }}
+                    />
+                    <StatCard
+                        title="Animal Shelters"
+                        value={stats.totalShelters}
+                        icon={Building2}
+                        description="Registered shelters"
+                        href="/admin/shelters"
+                    />
+                    <StatCard
+                        title="Listed Pets"
+                        value={stats.totalPets}
+                        icon={PawPrint}
+                        description="Available for adoption"
+                        href="/admin/pets"
+                    />
+                    <StatCard
+                        title="Pending Applications"
+                        value={stats.pendingApplications}
+                        icon={FileText}
+                        description="Requiring review"
+                        href="/admin/applications"
+                    />
+                </div>
+
+                <div className="grid gap-4 grid-cols-1 md:grid-cols-2 mt-4">
+                    {/* Recent Activity */}
+                    <Card className="md:col-span-2">
+                        <CardHeader>
+                            <CardTitle>Recent Activity</CardTitle>
+                            <CardDescription>Latest platform updates and changes</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-4">
+                                {stats.recentActivity.length > 0 ? (
+                                    stats.recentActivity.map((activity) => (
+                                        <div 
+                                            key={activity.id} 
+                                            className="flex items-center justify-between p-2 hover:bg-secondary/50 rounded-lg"
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <ActivityIcon type={activity.type} />
+                                                <div>
+                                                    <p className="text-sm">{activity.message}</p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {new Date(activity.timestamp).toLocaleString()}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="text-center text-muted-foreground py-8">
+                                        No recent activity to display
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* System Alerts */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <AlertTriangle className="h-5 w-5" />
+                                System Alerts
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {/* Add system alerts here */}
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+        </div>
+    );
 }
+
+// Helper component for activity icons
+const ActivityIcon = ({ type }: { type: string }) => {
+    switch (type) {
+        case 'user':
+            return <Users className="h-4 w-4 text-blue-500" />;
+        case 'pet':
+            return <PawPrint className="h-4 w-4 text-green-500" />;
+        case 'shelter':
+            return <Building2 className="h-4 w-4 text-purple-500" />;
+        default:
+            return <FileText className="h-4 w-4 text-gray-500" />;
+    }
+};
 
 ```
 
@@ -3635,172 +3943,598 @@ export default function AdminDashboard() {
 ### File: ./src/pages/admin/UserManagement.tsx
 ```
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from '@/components/ui/select';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
 } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/axios';
+import { 
+    MoreHorizontal, 
+    Search, 
+    UserPlus, 
+    Shield, 
+    Ban, 
+    Mail,
+    RefreshCw
+} from 'lucide-react';
 
 interface User {
-  user_id: number;
-  username: string;
-  email: string;
-  role: string;
-  account_status: string;
-  registration_date: string;
+    user_id: number;
+    username: string;
+    email: string;
+    role: string;
+    account_status: string;
+    registration_date: string;
+    last_login?: string;
+}
+
+interface UserFilters {
+    search?: string;
+    role?: string;
+    status?: string;
 }
 
 export default function UserManagement() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
+    const [users, setUsers] = useState<User[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [filters, setFilters] = useState<UserFilters>({});
+    const { toast } = useToast();
+    const navigate = useNavigate();
+    const { user: currentUser } = useAuth();
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
+    useEffect(() => {
+        // Check admin access
+        if (currentUser?.role !== 'admin') {
+            navigate('/unauthorized');
+            return;
+        }
+        
+        fetchUsers();
+    }, [currentUser, navigate]);
 
-  const fetchUsers = async () => {
-    try {
-      const response = await api.get('/admin/users');
-      setUsers(response.data.data);
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to fetch users",
-      });
-    } finally {
-      setLoading(false);
+    const fetchUsers = async (appliedFilters: UserFilters = filters) => {
+        try {
+            setLoading(true);
+            const response = await api.get('/admin/users', { params: appliedFilters });
+            if (response.data.success) {
+                setUsers(response.data.data);
+            } else {
+                throw new Error(response.data.error || 'Failed to fetch users');
+            }
+        } catch (error) {
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to fetch users"
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleRoleChange = async (userId: number, newRole: string) => {
+        try {
+            const response = await api.put(`/admin/users/${userId}/role`, { role: newRole });
+            if (response.data.success) {
+                fetchUsers();
+                toast({
+                    title: "Success",
+                    description: "User role updated successfully"
+                });
+            } else {
+                throw new Error(response.data.error || 'Failed to update role');
+            }
+        } catch (error) {
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to update user role"
+            });
+        }
+    };
+
+    const handleStatusChange = async (userId: number, newStatus: string) => {
+        try {
+            const response = await api.put(`/admin/users/${userId}/status`, { status: newStatus });
+            if (response.data.success) {
+                fetchUsers();
+                toast({
+                    title: "Success",
+                    description: "User status updated successfully"
+                });
+            } else {
+                throw new Error(response.data.error || 'Failed to update status');
+            }
+        } catch (error) {
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to update user status"
+            });
+        }
+    };
+
+    const resendVerificationEmail = async (userId: number) => {
+        try {
+            const response = await api.post(`/admin/users/${userId}/resend-verification`);
+            if (response.data.success) {
+                toast({
+                    title: "Success",
+                    description: "Verification email sent successfully"
+                });
+            } else {
+                throw new Error(response.data.error || 'Failed to send verification email');
+            }
+        } catch (error) {
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to send verification email"
+            });
+        }
+    };
+
+    const handleSearch = (searchTerm: string) => {
+        const newFilters = { ...filters, search: searchTerm };
+        setFilters(newFilters);
+        fetchUsers(newFilters);
+    };
+
+    const handleFilterChange = (key: string, value: string) => {
+        const newFilters = { ...filters, [key]: value };
+        setFilters(newFilters);
+        fetchUsers(newFilters);
+    };
+
+    if (loading) {
+        return (
+            <div className="flex justify-center items-center min-h-screen">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+        );
     }
-  };
 
-  const handleRoleChange = async (userId: number, newRole: string) => {
-    try {
-      await api.put(`/admin/users/${userId}/role`, { role: newRole });
-      fetchUsers(); // Refresh the list
-      toast({
-        title: "Success",
-        description: "User role updated successfully",
-      });
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to update user role",
-      });
-    }
-  };
-
-  const handleStatusChange = async (userId: number, newStatus: string) => {
-    try {
-      await api.put(`/admin/users/${userId}/status`, { status: newStatus });
-      fetchUsers(); // Refresh the list
-      toast({
-        title: "Success",
-        description: "User status updated successfully",
-      });
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to update user status",
-      });
-    }
-  };
-
-  if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+        <div className="container mx-auto p-6">
+            <Card>
+                <CardHeader>
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <CardTitle>User Management</CardTitle>
+                            <CardDescription>
+                                Manage user roles and account status
+                            </CardDescription>
+                        </div>
+                        <Button>
+                            <UserPlus className="mr-2 h-4 w-4" />
+                            Add User
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <div className="flex gap-4 mb-6">
+                        <div className="flex-1 relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search users..."
+                                className="pl-9"
+                                onChange={(e) => handleSearch(e.target.value)}
+                            />
+                        </div>
+                        <Select
+                            defaultValue={filters.role}
+                            onValueChange={(value) => handleFilterChange('role', value)}
+                        >
+                            <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Filter by role" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Roles</SelectItem>
+                                <SelectItem value="admin">Admin</SelectItem>
+                                <SelectItem value="shelter_staff">Shelter Staff</SelectItem>
+                                <SelectItem value="adopter">Adopter</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Select
+                            defaultValue={filters.status}
+                            onValueChange={(value) => handleFilterChange('status', value)}
+                        >
+                            <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Filter by status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Statuses</SelectItem>
+                                <SelectItem value="active">Active</SelectItem>
+                                <SelectItem value="pending">Pending</SelectItem>
+                                <SelectItem value="suspended">Suspended</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
 
-  return (
-    <div className="container mx-auto p-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>User Management</CardTitle>
-          <CardDescription>
-            Manage user roles and account status
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Username</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Registration Date</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map((user) => (
-                <TableRow key={user.user_id}>
-                  <TableCell>{user.username}</TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>
-                    <Select
-                      defaultValue={user.role}
-                      onValueChange={(value) => handleRoleChange(user.user_id, value)}
-                    >
-                      <SelectTrigger className="w-32">
-                        <SelectValue>{user.role}</SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="adopter">Adopter</SelectItem>
-                        <SelectItem value="shelter_staff">Shelter Staff</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                  <TableCell>
-                    <Select
-                      defaultValue={user.account_status}
-                      onValueChange={(value) => handleStatusChange(user.user_id, value)}
-                    >
-                      <SelectTrigger className="w-32">
-                        <SelectValue>{user.account_status}</SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="suspended">Suspended</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                  <TableCell>
-                    {new Date(user.registration_date).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    <Button variant="outline" size="sm">
-                      View Details
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-    </div>
-  );
+                    <div className="rounded-md border">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Username</TableHead>
+                                    <TableHead>Email</TableHead>
+                                    <TableHead>Role</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Registration Date</TableHead>
+                                    <TableHead>Last Login</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {users.map((user) => (
+                                    <TableRow key={user.user_id}>
+                                        <TableCell className="font-medium">{user.username}</TableCell>
+                                        <TableCell>{user.email}</TableCell>
+                                        <TableCell>
+                                            <Select
+                                                defaultValue={user.role}
+                                                onValueChange={(value) => handleRoleChange(user.user_id, value)}
+                                                disabled={currentUser?.user_id === user.user_id}
+                                            >
+                                                <SelectTrigger className="w-[140px]">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="adopter">Adopter</SelectItem>
+                                                    <SelectItem value="shelter_staff">Shelter Staff</SelectItem>
+                                                    <SelectItem value="admin">Admin</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
+                                                ${user.account_status === 'active' ? 'bg-green-100 text-green-800' :
+                                                user.account_status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                                'bg-red-100 text-red-800'}`}>
+                                                {user.account_status.charAt(0).toUpperCase() + user.account_status.slice(1)}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            {new Date(user.registration_date).toLocaleDateString()}
+                                        </TableCell>
+                                        <TableCell>
+                                            {user.last_login ? new Date(user.last_login).toLocaleString() : 'Never'}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" className="h-8 w-8 p-0">
+                                                        <span className="sr-only">Open menu</span>
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                                    <DropdownMenuItem
+                                                        onClick={() => handleStatusChange(user.user_id, 
+                                                            user.account_status === 'suspended' ? 'active' : 'suspended')}
+                                                    >
+                                                        {user.account_status === 'suspended' ? (
+                                                            <>
+                                                                <RefreshCw className="mr-2 h-4 w-4" />
+                                                                Reactivate Account
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Ban className="mr-2 h-4 w-4" />
+                                                                Suspend Account
+                                                            </>
+                                                        )}
+                                                    </DropdownMenuItem>
+                                                    {user.account_status === 'pending' && (
+                                                        <DropdownMenuItem
+                                                            onClick={() => resendVerificationEmail(user.user_id)}
+                                                        >
+                                                            <Mail className="mr-2 h-4 w-4" />
+                                                            Resend Verification
+                                                        </DropdownMenuItem>
+                                                    )}
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem
+                                                        onClick={() => navigate(`/admin/users/${user.user_id}`)}
+                                                    >
+                                                        <Shield className="mr-2 h-4 w-4" />
+                                                        View Full Profile
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+    );
+}
+
+```
+
+
+### File: ./src/pages/admin/ShelterManagement.tsx
+```
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import api from '@/lib/axios';
+import { 
+    Building2,
+    MoreHorizontal, 
+    Search, 
+    Plus, 
+    Edit, 
+    Trash2, 
+    Users,
+    CheckCircle,
+    XCircle
+} from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+
+interface Shelter {
+    shelter_id: number;
+    name: string;
+    address: string;
+    phone: string;
+    email: string;
+    is_no_kill: boolean;
+    manager_id: number | null;
+    total_pets: number;
+    active_applications: number;
+}
+
+interface ShelterFilters {
+    search?: string;
+    is_no_kill?: boolean;
+}
+
+export default function ShelterManagement() {
+    const [shelters, setShelters] = useState<Shelter[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [filters, setFilters] = useState<ShelterFilters>({});
+    const { toast } = useToast();
+    const navigate = useNavigate();
+    const { user } = useAuth();
+
+    useEffect(() => {
+        if (user?.role !== 'admin') {
+            navigate('/unauthorized');
+            return;
+        }
+        fetchShelters();
+    }, [user, navigate]);
+
+    const fetchShelters = async () => {
+        try {
+            setLoading(true);
+            const response = await api.get('/admin/shelters', { params: filters });
+            if (response.data.success) {
+                setShelters(response.data.data);
+            } else {
+                throw new Error(response.data.error || 'Failed to fetch shelters');
+            }
+        } catch (error) {
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to fetch shelters"
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDeleteShelter = async (shelterId: number) => {
+        if (!confirm('Are you sure you want to delete this shelter? This action cannot be undone.')) {
+            return;
+        }
+
+        try {
+            const response = await api.delete(`/admin/shelters/${shelterId}`);
+            if (response.data.success) {
+                toast({
+                    title: "Success",
+                    description: "Shelter deleted successfully"
+                });
+                fetchShelters();
+            } else {
+                throw new Error(response.data.error || 'Failed to delete shelter');
+            }
+        } catch (error: any) {
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: error.response?.data?.error || "Failed to delete shelter"
+            });
+        }
+    };
+
+    const handleSearch = (searchTerm: string) => {
+        const newFilters = { ...filters, search: searchTerm };
+        setFilters(newFilters);
+    };
+
+    if (loading) {
+        return (
+            <div className="flex justify-center items-center min-h-screen">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="container mx-auto p-6">
+            <Card>
+                <CardHeader>
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <CardTitle>Shelter Management</CardTitle>
+                            <CardDescription>
+                                Manage animal shelters and their information
+                            </CardDescription>
+                        </div>
+                        <Button onClick={() => navigate('/admin/shelters/new')}>
+                            <Plus className="mr-2 h-4 w-4" />
+                            Add New Shelter
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <div className="flex gap-4 mb-6">
+                        <div className="flex-1 relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search shelters..."
+                                className="pl-9"
+                                onChange={(e) => handleSearch(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="rounded-md border">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Name</TableHead>
+                                    <TableHead>Contact</TableHead>
+                                    <TableHead>Location</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Pets</TableHead>
+                                    <TableHead>Applications</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {shelters.map((shelter) => (
+                                    <TableRow key={shelter.shelter_id}>
+                                        <TableCell className="font-medium">
+                                            {shelter.name}
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="text-sm">
+                                                <div>{shelter.phone}</div>
+                                                <div className="text-muted-foreground">{shelter.email}</div>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="text-sm">{shelter.address}</div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge 
+                                                variant={shelter.is_no_kill ? "success" : "default"}
+                                                className="flex items-center gap-1 w-fit"
+                                            >
+                                                {shelter.is_no_kill ? 
+                                                    <CheckCircle className="h-3 w-3" /> : 
+                                                    <XCircle className="h-3 w-3" />
+                                                }
+                                                {shelter.is_no_kill ? 'No-Kill' : 'Standard'}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant="outline">{shelter.total_pets}</Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant="outline">{shelter.active_applications}</Badge>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" className="h-8 w-8 p-0">
+                                                        <span className="sr-only">Open menu</span>
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                                    <DropdownMenuItem
+                                                        onClick={() => navigate(`/admin/shelters/${shelter.shelter_id}`)}
+                                                    >
+                                                        <Building2 className="mr-2 h-4 w-4" />
+                                                        View Details
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        onClick={() => navigate(`/admin/shelters/${shelter.shelter_id}/staff`)}
+                                                    >
+                                                        <Users className="mr-2 h-4 w-4" />
+                                                        Manage Staff
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem
+                                                        onClick={() => navigate(`/admin/shelters/${shelter.shelter_id}/edit`)}
+                                                    >
+                                                        <Edit className="mr-2 h-4 w-4" />
+                                                        Edit Shelter
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        onClick={() => handleDeleteShelter(shelter.shelter_id)}
+                                                        className="text-red-600"
+                                                    >
+                                                        <Trash2 className="mr-2 h-4 w-4" />
+                                                        Delete Shelter
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+    );
 }
 
 ```
@@ -4487,14 +5221,15 @@ import AdoptionFormPage from './pages/AdoptionFormPage';
 import ApplicationsPage from './pages/profile/ApplicationsPage';
 import FavoritesPage from './pages/profile/FavoritesPage';
 
-
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
 import UserManagement from './pages/admin/UserManagement';
+import ShelterManagement from './pages/admin/ShelterManagement';
 
 // Shelter Pages
 import ShelterDashboard from './pages/shelter/ShelterDashboard';
-import ShelterManagement from './pages/shelter/ShelterManagement';
+import ShelterPetManagement from './pages/shelter/ShelterManagement';
+import NewShelterPage from './pages/admin/NewShelterPage';
 
 function App() {
   return (
@@ -4507,74 +5242,27 @@ function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
-            <Route path="/pets" element={<PetsPage />} />
-            <Route path="/pets/:id" element={<PetDetailPage />} />
             <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
-            {/* Protected Routes (Any authenticated user) */}
+            {/* Protected Routes */}
             <Route 
-              path="/profile" 
+              path="/pets" 
               element={
                 <ProtectedRoute>
-                  <ProfilePage />
+                  <PetsPage />
                 </ProtectedRoute>
               } 
+            />
+            <Route 
+              path="/pets/:id" 
+              element={
+                <ProtectedRoute>
+                  <PetDetailPage />
+                </ProtectedRoute>
+              }
             />
 
-            <Route 
-              path="/adopt/:id" 
-              element={
-                <ProtectedRoute>
-                  <AdoptionFormPage />
-                </ProtectedRoute>
-              } 
-            />
-            
-            <Route 
-              path="/profile/settings" 
-              element={
-                <ProtectedRoute>
-                  <ProfileSettings />
-                </ProtectedRoute>
-              } 
-            />
-
-            <Route 
-              path="/profile/applications" 
-              element={
-                <ProtectedRoute>
-                  <ApplicationsPage />
-                </ProtectedRoute>
-              } 
-            />
-
-            <Route 
-              path="/profile/favorites" 
-              element={
-                <ProtectedRoute>
-                  <FavoritesPage />
-                </ProtectedRoute>
-              } 
-            />
-            
-            <Route 
-              path="/quiz" 
-              element={
-                <ProtectedRoute>
-                  <QuizPage />
-                </ProtectedRoute>
-              } 
-            />
-            
-            <Route 
-              path="/quiz/results" 
-              element={
-                <ProtectedRoute>
-                  <QuizResultsPage />
-                </ProtectedRoute>
-              } 
-            />
-
+            {/* Admin Routes */}
             <Route 
               path="/admin/*" 
               element={
@@ -4583,20 +5271,64 @@ function App() {
                     <Route path="/" element={<AdminDashboard />} />
                     <Route path="/users" element={<UserManagement />} />
                     <Route path="/shelters" element={<ShelterManagement />} />
+                    <Route path="/shelters/new" element={<NewShelterPage />} />
                   </Routes>
                 </RoleProtectedRoute>
               }
             />
 
+            {/* Shelter Staff Routes */}
             <Route 
               path="/shelter/*" 
               element={
                 <RoleProtectedRoute requiredRole="shelter_staff">
                   <Routes>
                     <Route path="/" element={<ShelterDashboard />} />
-                    <Route path="/pets" element={<ShelterManagement />} />
+                    <Route path="/pets" element={<ShelterPetManagement />} />
                   </Routes>
                 </RoleProtectedRoute>
+              }
+            />
+
+            {/* Profile Routes */}
+            <Route 
+              path="/profile/*" 
+              element={
+                <ProtectedRoute>
+                  <Routes>
+                    <Route path="/" element={<ProfilePage />} />
+                    <Route path="/settings" element={<ProfileSettings />} />
+                    <Route path="/applications" element={<ApplicationsPage />} />
+                    <Route path="/favorites" element={<FavoritesPage />} />
+                  </Routes>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route 
+              path="/quiz" 
+              element={
+                <ProtectedRoute>
+                  <QuizPage />
+                </ProtectedRoute>
+              }
+            />
+            
+            <Route 
+              path="/quiz/results" 
+              element={
+                <ProtectedRoute>
+                  <QuizResultsPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route 
+              path="/adopt/:id" 
+              element={
+                <ProtectedRoute>
+                  <AdoptionFormPage />
+                </ProtectedRoute>
               }
             />
           </Routes>
@@ -4653,6 +5385,7 @@ export default defineConfig({
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-avatar": "^1.1.1",
+    "@radix-ui/react-checkbox": "^1.1.2",
     "@radix-ui/react-dialog": "^1.1.2",
     "@radix-ui/react-dropdown-menu": "^2.1.2",
     "@radix-ui/react-label": "^2.1.0",

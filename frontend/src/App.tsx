@@ -19,14 +19,15 @@ import AdoptionFormPage from './pages/AdoptionFormPage';
 import ApplicationsPage from './pages/profile/ApplicationsPage';
 import FavoritesPage from './pages/profile/FavoritesPage';
 
-
 // Admin Pages
 import AdminDashboard from './pages/admin/AdminDashboard';
 import UserManagement from './pages/admin/UserManagement';
+import ShelterManagement from './pages/admin/ShelterManagement';
 
 // Shelter Pages
 import ShelterDashboard from './pages/shelter/ShelterDashboard';
-import ShelterManagement from './pages/shelter/ShelterManagement';
+import ShelterPetManagement from './pages/shelter/ShelterManagement';
+import NewShelterPage from './pages/admin/NewShelterPage';
 
 function App() {
   return (
@@ -39,74 +40,27 @@ function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
-            <Route path="/pets" element={<PetsPage />} />
-            <Route path="/pets/:id" element={<PetDetailPage />} />
             <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
-            {/* Protected Routes (Any authenticated user) */}
+            {/* Protected Routes */}
             <Route 
-              path="/profile" 
+              path="/pets" 
               element={
                 <ProtectedRoute>
-                  <ProfilePage />
+                  <PetsPage />
                 </ProtectedRoute>
               } 
+            />
+            <Route 
+              path="/pets/:id" 
+              element={
+                <ProtectedRoute>
+                  <PetDetailPage />
+                </ProtectedRoute>
+              }
             />
 
-            <Route 
-              path="/adopt/:id" 
-              element={
-                <ProtectedRoute>
-                  <AdoptionFormPage />
-                </ProtectedRoute>
-              } 
-            />
-            
-            <Route 
-              path="/profile/settings" 
-              element={
-                <ProtectedRoute>
-                  <ProfileSettings />
-                </ProtectedRoute>
-              } 
-            />
-
-            <Route 
-              path="/profile/applications" 
-              element={
-                <ProtectedRoute>
-                  <ApplicationsPage />
-                </ProtectedRoute>
-              } 
-            />
-
-            <Route 
-              path="/profile/favorites" 
-              element={
-                <ProtectedRoute>
-                  <FavoritesPage />
-                </ProtectedRoute>
-              } 
-            />
-            
-            <Route 
-              path="/quiz" 
-              element={
-                <ProtectedRoute>
-                  <QuizPage />
-                </ProtectedRoute>
-              } 
-            />
-            
-            <Route 
-              path="/quiz/results" 
-              element={
-                <ProtectedRoute>
-                  <QuizResultsPage />
-                </ProtectedRoute>
-              } 
-            />
-
+            {/* Admin Routes */}
             <Route 
               path="/admin/*" 
               element={
@@ -115,20 +69,64 @@ function App() {
                     <Route path="/" element={<AdminDashboard />} />
                     <Route path="/users" element={<UserManagement />} />
                     <Route path="/shelters" element={<ShelterManagement />} />
+                    <Route path="/shelters/new" element={<NewShelterPage />} />
                   </Routes>
                 </RoleProtectedRoute>
               }
             />
 
+            {/* Shelter Staff Routes */}
             <Route 
               path="/shelter/*" 
               element={
                 <RoleProtectedRoute requiredRole="shelter_staff">
                   <Routes>
                     <Route path="/" element={<ShelterDashboard />} />
-                    <Route path="/pets" element={<ShelterManagement />} />
+                    <Route path="/pets" element={<ShelterPetManagement />} />
                   </Routes>
                 </RoleProtectedRoute>
+              }
+            />
+
+            {/* Profile Routes */}
+            <Route 
+              path="/profile/*" 
+              element={
+                <ProtectedRoute>
+                  <Routes>
+                    <Route path="/" element={<ProfilePage />} />
+                    <Route path="/settings" element={<ProfileSettings />} />
+                    <Route path="/applications" element={<ApplicationsPage />} />
+                    <Route path="/favorites" element={<FavoritesPage />} />
+                  </Routes>
+                </ProtectedRoute>
+              }
+            />
+
+            <Route 
+              path="/quiz" 
+              element={
+                <ProtectedRoute>
+                  <QuizPage />
+                </ProtectedRoute>
+              }
+            />
+            
+            <Route 
+              path="/quiz/results" 
+              element={
+                <ProtectedRoute>
+                  <QuizResultsPage />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route 
+              path="/adopt/:id" 
+              element={
+                <ProtectedRoute>
+                  <AdoptionFormPage />
+                </ProtectedRoute>
               }
             />
           </Routes>

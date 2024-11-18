@@ -120,6 +120,32 @@ $app->group('/api', function ($group) {
         $controller = new AdminController();
         return $controller->resendVerification($request, $response, $args);
     })->add(new RoleMiddleware('admin'));
+
+    // Admin shelter routes
+    $group->get('/admin/shelters', function ($request, $response) {
+        $controller = new AdminController();
+        return $controller->listShelters($request, $response);
+    })->add(new RoleMiddleware('admin'));
+
+    $group->post('/admin/shelters', function ($request, $response) {
+        $controller = new AdminController();
+        return $controller->createShelter($request, $response);
+    })->add(new RoleMiddleware('admin'));
+
+    $group->get('/admin/shelters/{id}', function ($request, $response, $args) {
+        $controller = new AdminController();
+        return $controller->getShelter($request, $response, $args);
+    })->add(new RoleMiddleware('admin'));
+
+    $group->put('/admin/shelters/{id}', function ($request, $response, $args) {
+        $controller = new AdminController();
+        return $controller->updateShelter($request, $response, $args);
+    })->add(new RoleMiddleware('admin'));
+
+    $group->delete('/admin/shelters/{id}', function ($request, $response, $args) {
+        $controller = new AdminController();
+        return $controller->deleteShelter($request, $response, $args);
+    })->add(new RoleMiddleware('admin'));
     
     // Shelter routes
     $group->post('/shelters', function ($request, $response) {
