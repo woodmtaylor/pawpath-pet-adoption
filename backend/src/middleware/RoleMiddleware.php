@@ -17,9 +17,15 @@ class RoleMiddleware
     
     public function __invoke(Request $request, RequestHandler $handler): Response
     {
-        $user = $request->getAttribute('user');
+        $userId = $request->getAttribute('user_id');
         
-        if (!$user || !isset($user['role'])) {
+        // Get user from the database
+        $db = \PawPath\config\database\DatabaseConfig::getConnection();
+        $stmt = $db->prepare("SELECT role FROM User WHERE user_id = ?");
+        $stmt->execute([$userId]);
+        $user = $stmt->fetch();
+        
+        if (!$user) {
             $response = new Response();
             $response->getBody()->write(json_encode([
                 'success' => false,
@@ -29,15 +35,15 @@ class RoleMiddleware
                            ->withHeader('Content-Type', 'application/json');
         }
         
-        // Get role hierarchy from permissions config
+        // Get role hierarchy
         $roleHierarchy = [
-            'admin' => ['admin', 'shelter_staff', 'adopter'],
-            'shelter_staff' => ['shelter_staff', 'adopter'],
-            'adopter' => ['adopter']
+            'admin' => ['admin'],
+            'shelter_staff' => ['admin', 'shelter_staff'],
+            'adopter' => ['admin', 'shelter_staff', 'adopter']
         ];
         
         // Check if user's role has permission
-        if (!in_array($this->requiredRole, $roleHierarchy[$user['role']] ?? [])) {
+        if (!in_array($user['role'], $roleHierarchy[$this->requiredRole] ?? [])) {
             $response = new Response();
             $response->getBody()->write(json_encode([
                 'success' => false,
@@ -46,6 +52,12 @@ class RoleMiddleware
             return $response->withStatus(403)
                            ->withHeader('Content-Type', 'application/json');
         }
+        
+        // Add user to request attributes
+        $request = $request->withAttribute('user', [
+            'user_id' => $userId,
+            'role' => $user['role']
+        ]);
         
         return $handler->handle($request);
     }

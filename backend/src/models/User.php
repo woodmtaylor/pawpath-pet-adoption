@@ -104,6 +104,76 @@ class User {
         }
     }
 
+    public function findAll(array $filters = []): array {
+        try {
+            $query = "
+                SELECT user_id, username, email, role, account_status, 
+                       registration_date, last_login, email_verified_at
+                FROM User
+                WHERE 1=1
+            ";
+            $params = [];
+
+            if (!empty($filters['search'])) {
+                $query .= " AND (username LIKE ? OR email LIKE ?)";
+                $searchTerm = '%' . $filters['search'] . '%';
+                $params[] = $searchTerm;
+                $params[] = $searchTerm;
+            }
+
+            if (!empty($filters['role'])) {
+                $query .= " AND role = ?";
+                $params[] = $filters['role'];
+            }
+
+            if (!empty($filters['account_status'])) {
+                $query .= " AND account_status = ?";
+                $params[] = $filters['account_status'];
+            }
+
+            $query .= " ORDER BY registration_date DESC";
+
+            $stmt = $this->db->prepare($query);
+            $stmt->execute($params);
+            return $stmt->fetchAll();
+        } catch (PDOException $e) {
+            error_log("Error in findAll: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    public function countUsers(): int {
+        try {
+            $stmt = $this->db->query("SELECT COUNT(*) FROM User");
+            return (int) $stmt->fetchColumn();
+        } catch (PDOException $e) {
+            error_log("Error counting users: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    public function countByRole(string $role): int {
+        try {
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM User WHERE role = ?");
+            $stmt->execute([$role]);
+            return (int) $stmt->fetchColumn();
+        } catch (PDOException $e) {
+            error_log("Error counting users by role: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    public function countByStatus(string $status): int {
+        try {
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM User WHERE account_status = ?");
+            $stmt->execute([$status]);
+            return (int) $stmt->fetchColumn();
+        } catch (PDOException $e) {
+            error_log("Error counting users by status: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
     public function verifyEmail(int $userId): bool {
         try {
             $stmt = $this->db->prepare("

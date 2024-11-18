@@ -11,7 +11,9 @@ use PawPath\api\ShelterController;
 use PawPath\api\PetController;
 use PawPath\api\QuizController;
 use PawPath\api\AdoptionController;
+use PawPath\api\AdminController;
 use PawPath\middleware\AuthMiddleware;
+use PawPath\middleware\RoleMiddleware;
 use PawPath\api\BlogController;
 use PawPath\api\ProductController;
 use PawPath\api\UserProfileController;
@@ -92,6 +94,32 @@ $app->group('/api', function ($group) {
         $controller = new QuizController();
         return $controller->getQuizResult($request, $response, $args);
     });
+
+    // Admin routes
+    $group->get('/admin/stats', function ($request, $response) {
+        $controller = new AdminController();
+        return $controller->getStats($request, $response);
+    })->add(new RoleMiddleware('admin'));
+
+    $group->get('/admin/users', function ($request, $response) {
+        $controller = new AdminController();
+        return $controller->listUsers($request, $response);
+    })->add(new RoleMiddleware('admin'));
+
+    $group->put('/admin/users/{id}/role', function ($request, $response, $args) {
+        $controller = new AdminController();
+        return $controller->updateUserRole($request, $response, $args);
+    })->add(new RoleMiddleware('admin'));
+
+    $group->put('/admin/users/{id}/status', function ($request, $response, $args) {
+        $controller = new AdminController();
+        return $controller->updateUserStatus($request, $response, $args);
+    })->add(new RoleMiddleware('admin'));
+
+    $group->post('/admin/users/{id}/resend-verification', function ($request, $response, $args) {
+        $controller = new AdminController();
+        return $controller->resendVerification($request, $response, $args);
+    })->add(new RoleMiddleware('admin'));
     
     // Shelter routes
     $group->post('/shelters', function ($request, $response) {
