@@ -1,3 +1,10 @@
+export interface PetImage {
+    image_id: number;
+    url: string;
+    is_primary: boolean;
+    created_at: string;
+}
+
 export interface PetTrait {
     trait_id: number;
     trait_name: string;
@@ -16,6 +23,7 @@ export interface Pet {
     traits: {
         [category: string]: string[];
     };
+    images?: PetImage[];
 }
 
 export interface ApiResponse<T> {

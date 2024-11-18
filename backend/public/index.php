@@ -299,6 +299,21 @@ $app->group('/api', function ($group) {
                            ->withStatus(400);
         }
     });
+
+    $group->post('/pets/{id}/images', function ($request, $response, $args) {
+        $controller = new PetController();
+        return $controller->uploadImages($request, $response, $args);
+    });
+
+    $group->delete('/pets/{id}/images/{imageId}', function ($request, $response, $args) {
+        $controller = new PetController();
+        return $controller->deleteImage($request, $response, $args);
+    });
+
+    $group->put('/pets/{id}/images/{imageId}/primary', function ($request, $response, $args) {
+        $controller = new PetController();
+        return $controller->setPrimaryImage($request, $response, $args);
+    });
     
     // Adoption Application routes
     $group->post('/adoptions', function ($request, $response) {

@@ -12,31 +12,18 @@ interface PetCardProps {
     gender: string;
     description: string;
     shelter_name: string;
-    traits?: { [category: string]: string[] }; // Make traits optional
-    images?: string[];
+    traits?: { [category: string]: string[] };
+    images?: Array<{
+      image_id: number;
+      url: string;
+      is_primary: boolean;
+    }>;
   };
   onClick?: () => void;
 }
 
 export function PetCard({ pet, onClick }: PetCardProps) {
-  const renderTraits = () => {
-    // Handle case where traits is undefined or null
-    if (!pet.traits) {
-      return null;
-    }
-
-    return Object.entries(pet.traits).map(([category, traits]) => (
-      Array.isArray(traits) ? traits.map(trait => (
-        <Badge
-          key={`${category}-${trait}`}
-          variant="secondary"
-          className="text-xs"
-        >
-          {trait}
-        </Badge>
-      )) : null
-    ));
-  };
+  const primaryImage = pet.images?.find(img => img.is_primary) || pet.images?.[0];
 
   return (
     <Card
@@ -44,11 +31,11 @@ export function PetCard({ pet, onClick }: PetCardProps) {
       onClick={onClick}
     >
       <div className="aspect-square relative bg-muted">
-        {pet.images?.[0] ? (
+        {primaryImage ? (
           <img
-            src={pet.images[0]}
+            src={primaryImage.url}
             alt={pet.name}
-            className="object-cover w-full h-full"
+            className="object-cover w-full h-full rounded-t-lg"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
@@ -71,7 +58,17 @@ export function PetCard({ pet, onClick }: PetCardProps) {
 
         {pet.traits && Object.keys(pet.traits).length > 0 && (
           <div className="flex flex-wrap gap-2 mb-4">
-            {renderTraits()}
+            {Object.entries(pet.traits).map(([category, traits]) => (
+              Array.isArray(traits) ? traits.map(trait => (
+                <Badge
+                  key={`${category}-${trait}`}
+                  variant="secondary"
+                  className="text-xs"
+                >
+                  {trait}
+                </Badge>
+              )) : null
+            ))}
           </div>
         )}
 

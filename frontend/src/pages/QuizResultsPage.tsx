@@ -17,13 +17,18 @@ interface Pet {
   traits: {
     [category: string]: string[];
   };
+  images?: Array<{
+    image_id: number;
+    url: string;
+    is_primary: boolean;
+  }>;
   match_score?: number;
 }
 
 interface QuizResults {
   recommended_species: string;
-  trait_preferences?: Array<{ trait: string; value: string }>;  // Changed to match backend
-  recommended_traits?: string[];  // Made optional
+  trait_preferences?: Array<{ trait: string; value: string }>;
+  recommended_traits?: string[];
   matching_pets: Pet[];
   confidence_score: number;
 }
@@ -114,54 +119,84 @@ function QuizResultsPage() {
           </CardContent>
         </Card>
 
-        {results.matching_pets?.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Your Top Matches</CardTitle>
-              <CardDescription>
-                These pets match your lifestyle and preferences
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-6 md:grid-cols-2">
-                {results.matching_pets.map((pet) => (
-                  <Card key={pet.pet_id}>
-                    <CardContent className="pt-6">
-                      <div className="flex justify-between items-start mb-4">
-                        <div>
-                          <h3 className="font-semibold text-lg">{pet.name}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            {pet.breed} • {pet.age} years old
-                          </p>
+            {results.matching_pets?.length > 0 && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Your Top Matches</CardTitle>
+                        <CardDescription>
+                            These pets match your lifestyle and preferences
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid gap-6 md:grid-cols-2">
+                            {results.matching_pets.map((pet) => (
+                                <Card key={pet.pet_id} className="overflow-hidden">
+                                    <div className="aspect-square relative">
+                                        {pet.images && pet.images.length > 0 ? (
+                                            <img
+                                                src={pet.images[0].url}
+                                                alt={pet.name}
+                                                className="object-cover w-full h-full"
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center bg-muted">
+                                                <PawPrint className="h-12 w-12 text-muted-foreground" />
+                                            </div>
+                                        )}
+                                        {pet.match_score && (
+                                            <Badge 
+                                                className="absolute top-2 right-2"
+                                                variant="secondary"
+                                            >
+                                                {pet.match_score}% Match
+                                            </Badge>
+                                        )}
+                                    </div>
+                                    <CardContent className="p-4">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div>
+                                                <h3 className="font-semibold text-lg">{pet.name}</h3>
+                                                <p className="text-sm text-muted-foreground">
+                                                    {pet.breed} • {pet.age} years old
+                                                </p>
+                                            </div>
+                                        </div>
+                                        
+                                        <p className="text-sm mb-4">{pet.description}</p>
+                                        
+                                        {pet.traits && Object.keys(pet.traits).length > 0 && (
+                                            <div className="flex flex-wrap gap-2 mb-4">
+                                                {Object.entries(pet.traits).map(([category, traits]) => (
+                                                    traits.map((trait) => (
+                                                        <Badge 
+                                                            key={`${category}-${trait}`}
+                                                            variant="outline"
+                                                        >
+                                                            {trait}
+                                                        </Badge>
+                                                    ))
+                                                ))}
+                                            </div>
+                                        )}
+                                        
+                                        <p className="text-sm text-muted-foreground mb-4">
+                                            Available at {pet.shelter_name}
+                                        </p>
+                                        
+                                        <Button 
+                                            className="w-full"
+                                            onClick={() => navigate(`/pets/${pet.pet_id}`)}
+                                        >
+                                            <Heart className="mr-2 h-4 w-4" />
+                                            Meet {pet.name}
+                                        </Button>
+                                    </CardContent>
+                                </Card>
+                            ))}
                         </div>
-                        {pet.match_score && (
-                          <Badge variant="secondary">
-                            {pet.match_score}% Match
-                          </Badge>
-                        )}
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <p className="text-sm">{pet.description}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Available at {pet.shelter_name}
-                        </p>
-                      </div>
-                      
-                      <Button 
-                        className="w-full mt-4"
-                        onClick={() => navigate(`/pets/${pet.pet_id}`)}
-                      >
-                        <Heart className="mr-2 h-4 w-4" />
-                        Meet {pet.name}
-                      </Button>
                     </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                </Card>
+            )}
       </div>
 
       <div className="flex justify-center gap-4">

@@ -3,10 +3,11 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PetFilters } from '@/components/pets/PetFilters';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Search, PawPrint, ArrowRight } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Search, PawPrint } from 'lucide-react';
+import { PetCard } from '@/components/pets/PetCard';
 import api from '@/lib/axios';
-import { Pet, ApiResponse } from '@/types/api';
+import { Pet, ApiResponse, PaginatedResponse } from '@/types/api';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -21,11 +22,14 @@ interface PetFiltersState {
     traits?: string[];
 }
 
-interface PaginatedResponse {
-    items: Pet[];
-    total: number;
-    page: number;
-    perPage: number;
+interface TraitResponse {
+    success: boolean;
+    data: {
+        traits: Array<{
+            trait_id: number;
+            trait_name: string;
+        }>;
+    };
 }
 
 function PetsPage() {
@@ -53,7 +57,6 @@ function PetsPage() {
         if (search) newParams.set('search', search);
         else newParams.delete('search');
         
-        // Handle filters
         Object.entries(currentFilters).forEach(([key, value]) => {
             if (value !== undefined && value !== null && value !== '') {
                 if (Array.isArray(value)) {
@@ -81,8 +84,10 @@ function PetsPage() {
     useEffect(() => {
         const fetchTraits = async () => {
             try {
-                const response = await api.get('/pet-traits');
-                setAvailableTraits(response.data.map((trait: any) => trait.trait_name));
+                const response = await api.get<TraitResponse>('/pet-traits');
+                if (response.data.success && response.data.data.traits) {
+                    setAvailableTraits(response.data.data.traits.map(trait => trait.trait_name));
+                }
             } catch (err) {
                 console.error('Failed to fetch traits:', err);
             }
@@ -94,13 +99,15 @@ function PetsPage() {
     // Fetch pets with pagination
     useEffect(() => {
         const fetchPets = async () => {
+            if (!isAuthenticated) return;
+            
             try {
                 setLoading(true);
                 setError(null);
 
                 const offset = (currentPage - 1) * perPage;
 
-                const response = await api.get<ApiResponse<PaginatedResponse>>('/pets', { 
+                const response = await api.get<ApiResponse<PaginatedResponse<Pet>>>('/pets', { 
                     params: {
                         page: currentPage,
                         perPage,
@@ -134,10 +141,7 @@ function PetsPage() {
             }
         };
 
-        if (isAuthenticated) {
-            const timeoutId = setTimeout(fetchPets, 300);
-            return () => clearTimeout(timeoutId);
-        }
+        fetchPets();
     }, [currentPage, searchTerm, filters, toast, updateUrlParams, isAuthenticated]);
 
     const handleSearch = (event: React.FormEvent) => {
@@ -154,11 +158,7 @@ function PetsPage() {
         updateUrlParams(page, searchTerm, filters);
     };
 
-    const handlePetClick = (petId: number) => {
-        navigate(`/pets/${petId}`);
-    };
-
-    // Pagination Component
+    // Pagination Controls Component
     const PaginationControls = () => {
         const maxVisiblePages = 5;
         let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
@@ -289,44 +289,11 @@ function PetsPage() {
                 <>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {pets.map((pet) => (
-                            <Card 
-                                key={pet.pet_id} 
-                                className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
-                                onClick={() => handlePetClick(pet.pet_id)}
-                            >
-                                <CardHeader>
-                                    <CardTitle>{pet.name}</CardTitle>
-                                    <CardDescription>
-                                        {pet.breed} • {pet.gender} • {pet.age} years old
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <p className="text-muted-foreground mb-4">{pet.description}</p>
-                                    
-                                    {pet.traits && Object.entries(pet.traits).map(([category, traits]) => (
-                                        <div key={category} className="mb-2">
-                                            <h4 className="text-sm font-medium text-muted-foreground">
-                                                {category}:
-                                            </h4>
-                                            <div className="flex flex-wrap gap-1">
-                                                {traits.map((trait) => (
-                                                    <span
-                                                        key={trait}
-                                                        className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary"
-                                                    >
-                                                        {trait}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </CardContent>
-                                <CardFooter className="justify-end">
-                                    <Button variant="ghost" size="sm">
-                                        View Details <ArrowRight className="ml-2 h-4 w-4" />
-                                    </Button>
-                                </CardFooter>
-                            </Card>
+                            <PetCard
+                                key={pet.pet_id}
+                                pet={pet}
+                                onClick={() => navigate(`/pets/${pet.pet_id}`)}
+                            />
                         ))}
                     </div>
 

@@ -151,22 +151,63 @@ function PetDetailPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Image Gallery */}
-        <div className="space-y-4">
-          <div className="aspect-square relative bg-muted rounded-lg overflow-hidden">
-            {pet.images && pet.images.length > 0 ? (
-              <img
-                src={pet.images[0]}
-                alt={pet.name}
-                className="object-cover w-full h-full"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <PawPrint className="h-12 w-12 text-muted-foreground" />
-              </div>
-            )}
-          </div>
-        </div>
+                <div className="space-y-4">
+                    <div className="aspect-square relative bg-muted rounded-lg overflow-hidden">
+                        {pet.images && pet.images.length > 0 ? (
+                            <>
+                                <img
+                                    src={pet.images[currentImageIndex].url}
+                                    alt={pet.name}
+                                    className="object-cover w-full h-full"
+                                />
+                                {pet.images.length > 1 && (
+                                    <>
+                                        <Button
+                                            variant="secondary"
+                                            size="icon"
+                                            className="absolute left-2 top-1/2 -translate-y-1/2"
+                                            onClick={() => navigateImage('prev')}
+                                        >
+                                            <ChevronLeft className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="secondary"
+                                            size="icon"
+                                            className="absolute right-2 top-1/2 -translate-y-1/2"
+                                            onClick={() => navigateImage('next')}
+                                        >
+                                            <ChevronRight className="h-4 w-4" />
+                                        </Button>
+                                    </>
+                                )}
+                            </>
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                                <PawPrint className="h-12 w-12 text-muted-foreground" />
+                            </div>
+                        )}
+                    </div>
 
+                    {/* Thumbnail Grid */}
+                    {pet.images && pet.images.length > 1 && (
+                        <div className="grid grid-cols-4 gap-2">
+                            {pet.images.map((image, index) => (
+                                <button
+                                    key={image.image_id}
+                                    className={`aspect-square rounded-md overflow-hidden border-2 
+                                        ${currentImageIndex === index ? 'border-primary' : 'border-transparent'}`}
+                                    onClick={() => setCurrentImageIndex(index)}
+                                >
+                                    <img
+                                        src={image.url}
+                                        alt={`${pet.name} ${index + 1}`}
+                                        className="object-cover w-full h-full"
+                                    />
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
         {/* Pet Details */}
         <div className="space-y-6">
           <div>
