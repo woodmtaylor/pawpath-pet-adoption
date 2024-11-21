@@ -1,168 +1,86 @@
 import { useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
-import { Loader2, X, Image as ImageIcon, Star } from 'lucide-react';
-import api from '@/lib/axios';
-
-interface PetImage {
-  image_id: number;
-  url: string;
-  is_primary: boolean;
-}
+import { Card } from '@/components/ui/card';
+import { Image as ImageIcon, X, Upload } from 'lucide-react';
 
 interface PetImageUploaderProps {
-  petId: number;
-  existingImages?: PetImage[];
-  onImagesUpdated: (images: PetImage[]) => void;
+  onChange: (files: File[]) => void;
+  maxFiles?: number;
+  accept?: string;
 }
 
-export function PetImageUploader({ petId, existingImages = [], onImagesUpdated }: PetImageUploaderProps) {
-  const [uploading, setUploading] = useState(false);
-  const [images, setImages] = useState<PetImage[]>(existingImages);
-  const { toast } = useToast();
+export function PetImageUploader({ 
+  onChange, 
+  maxFiles = 5, 
+  accept = "image/*" 
+}: PetImageUploaderProps) {
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
 
-  const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!event.target.files?.length) return;
-
-    try {
-      setUploading(true);
-      const formData = new FormData();
-      Array.from(event.target.files).forEach((file) => {
-        formData.append('images[]', file);
-      });
-
-      const response = await api.post(`/pets/${petId}/images`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-
-      if (response.data.success) {
-        const newImages = [...images, ...response.data.data];
-        setImages(newImages);
-        onImagesUpdated(newImages);
-        toast({
-          title: "Success",
-          description: "Images uploaded successfully"
-        });
-      }
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to upload images"
-      });
-    } finally {
-      setUploading(false);
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length + previewUrls.length > maxFiles) {
+      alert(`You can only upload up to ${maxFiles} images`);
+      return;
     }
+
+    // Create preview URLs
+    const newPreviewUrls = files.map(file => URL.createObjectURL(file));
+    setPreviewUrls(prev => [...prev, ...newPreviewUrls]);
+    
+    // Call onChange with all files
+    onChange(files);
   };
 
-  const handleDelete = async (imageId: number) => {
-    try {
-      const response = await api.delete(`/pets/${petId}/images/${imageId}`);
-      if (response.data.success) {
-        const updatedImages = images.filter(img => img.image_id !== imageId);
-        setImages(updatedImages);
-        onImagesUpdated(updatedImages);
-        toast({
-          title: "Success",
-          description: "Image deleted successfully"
-        });
-      }
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to delete image"
-      });
-    }
-  };
-
-  const setPrimary = async (imageId: number) => {
-    try {
-      const response = await api.put(`/pets/${petId}/images/${imageId}/primary`);
-      if (response.data.success) {
-        const updatedImages = images.map(img => ({
-          ...img,
-          is_primary: img.image_id === imageId
-        }));
-        setImages(updatedImages);
-        onImagesUpdated(updatedImages);
-        toast({
-          title: "Success",
-          description: "Primary image updated"
-        });
-      }
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to update primary image"
-      });
-    }
+  const removeImage = (index: number) => {
+    setPreviewUrls(prev => {
+      const newUrls = [...prev];
+      URL.revokeObjectURL(newUrls[index]); // Clean up URL object
+      newUrls.splice(index, 1);
+      return newUrls;
+    });
+    
+    // Notify parent about removed image
+    onChange([]);
   };
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {images.map((image) => (
-          <Card key={image.image_id} className="relative group">
-            <CardContent className="p-2">
+        {previewUrls.map((url, index) => (
+          <Card key={url} className="relative group">
+            <div className="aspect-square relative">
               <img
-                src={image.url}
-                alt="Pet"
-                className="w-full aspect-square object-cover rounded-md"
+                src={url}
+                alt={`Preview ${index + 1}`}
+                className="w-full h-full object-cover rounded-md"
               />
-              <div className="absolute top-4 right-4 space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                {!image.is_primary && (
-                  <Button
-                    size="icon"
-                    variant="secondary"
-                    onClick={() => setPrimary(image.image_id)}
-                  >
-                    <Star className="h-4 w-4" />
-                  </Button>
-                )}
-                <Button
-                  size="icon"
-                  variant="destructive"
-                  onClick={() => handleDelete(image.image_id)}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-              {image.is_primary && (
-                <Badge className="absolute top-4 left-4">
-                  Primary
-                </Badge>
-              )}
-            </CardContent>
+              <Button
+                size="icon"
+                variant="destructive"
+                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={() => removeImage(index)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </Card>
         ))}
 
-        <Card className="relative">
-          <CardContent className="p-2">
-            <label className="flex flex-col items-center justify-center w-full h-full aspect-square rounded-md border-2 border-dashed border-muted-foreground/25 hover:border-muted-foreground/50 cursor-pointer">
+        {previewUrls.length < maxFiles && (
+          <Card className="aspect-square flex items-center justify-center cursor-pointer hover:bg-accent transition-colors">
+            <label className="w-full h-full flex flex-col items-center justify-center cursor-pointer">
               <input
                 type="file"
                 className="hidden"
+                accept={accept}
                 multiple
-                accept="image/*"
-                onChange={handleUpload}
-                disabled={uploading}
+                onChange={handleFileChange}
               />
-              {uploading ? (
-                <Loader2 className="h-8 w-8 animate-spin" />
-              ) : (
-                <>
-                  <ImageIcon className="h-8 w-8 mb-2" />
-                  <span className="text-sm text-muted-foreground">
-                    Upload Images
-                  </span>
-                </>
-              )}
+              <Upload className="h-8 w-8 mb-2 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Upload Image</span>
             </label>
-          </CardContent>
-        </Card>
+          </Card>
+        )}
       </div>
     </div>
   );

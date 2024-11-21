@@ -47,6 +47,29 @@ class ShelterController {
             return ResponseHelper::sendError($response, $e->getMessage());
         }
     }
+
+    public function getShelterStats(Request $request, Response $response): Response {
+        try {
+            $userId = $request->getAttribute('user_id');
+            $stats = $this->shelterService->getShelterStats($userId);
+            return ResponseHelper::sendResponse($response, $stats);
+        } catch (\Exception $e) {
+            error_log("Error in getShelterStats: " . $e->getMessage());
+            return ResponseHelper::sendError($response, $e->getMessage());
+        }
+    }
+
+    public function getShelterPets(Request $request, Response $response): Response {
+        try {
+            $userId = $request->getAttribute('user_id');
+            $stats = $this->shelterService->getShelterStats($userId);
+            $pets = $this->shelterService->getShelterPets($stats['shelterId']);
+            return ResponseHelper::sendResponse($response, $pets);
+        } catch (\Exception $e) {
+            error_log("Error in getShelterPets: " . $e->getMessage());
+            return ResponseHelper::sendError($response, $e->getMessage());
+        }
+    }
     
     public function listShelters(Request $request, Response $response): Response {
         try {

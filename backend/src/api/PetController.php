@@ -65,6 +65,90 @@ class PetController {
                 ->withStatus(400);
         }
     }
+
+
+    public function submitPetForAdoption(Request $request, Response $response): Response {
+        try {
+            $userId = $request->getAttribute('user_id');
+            $data = $request->getParsedBody();
+            
+            // Add the submitting user's ID to the data
+            $data['submitted_by_user_id'] = $userId;
+            $data['status'] = 'pending';
+            
+            // Create the pet with pending status
+            $petId = $this->petService->createPet($data);
+            
+            // Handle image uploads if present
+            $uploadedFiles = $request->getUploadedFiles();
+            if (!empty($uploadedFiles['images'])) {
+                $this->handleImageUploads($petId, $uploadedFiles['images']);
+            }
+            
+            // Return success response
+            return ResponseHelper::sendResponse(
+                $response,
+                ['message' => 'Pet submitted for approval', 'pet_id' => $petId],
+                201
+            );
+        } catch (\Exception $e) {
+            return ResponseHelper::sendError(
+                $response,
+                $e->getMessage(),
+                400
+            );
+        }
+    }
+
+    public function getPetSubmissions(Request $request, Response $response): Response {
+        try {
+            $queryParams = $request->getQueryParams();
+            $status = $queryParams['status'] ?? 'pending';
+            
+            $submissions = $this->petService->getPetSubmissions($status);
+            
+            return ResponseHelper::sendResponse($response, $submissions);
+        } catch (\Exception $e) {
+            return ResponseHelper::sendError($response, $e->getMessage());
+        }
+    }
+
+    public function reviewPetSubmission(Request $request, Response $response, array $args): Response {
+        try {
+            $petId = (int) $args['id'];
+            $userId = $request->getAttribute('user_id');
+            $data = $request->getParsedBody();
+            
+            if (!isset($data['status']) || !in_array($data['status'], ['approved', 'rejected'])) {
+                throw new \InvalidArgumentException('Invalid status provided');
+            }
+            
+            $result = $this->petService->reviewPetSubmission(
+                $petId,
+                $userId,
+                $data['status'],
+                $data['note'] ?? null
+            );
+            
+            return ResponseHelper::sendResponse($response, $result);
+        } catch (\Exception $e) {
+            return ResponseHelper::sendError($response, $e->getMessage());
+        }
+    }
+
+    private function handleImageUploads(int $petId, array $images): void {
+        foreach ($images as $image) {
+            if ($image->getError() === UPLOAD_ERR_OK) {
+                $imageUrl = $this->imageService->uploadImage([
+                    'tmp_name' => $image->getStream()->getMetadata('uri'),
+                    'error' => $image->getError(),
+                    'type' => $image->getClientMediaType()
+                ]);
+                
+                $this->petImageModel->create($petId, $imageUrl, false);
+            }
+        }
+    }
        
 
     public function getPet(Request $request, Response $response, array $args): Response {

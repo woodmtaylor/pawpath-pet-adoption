@@ -165,6 +165,16 @@ $app->group('/api', function ($group) {
             return $controller->listShelters($request, $response);
         });
 
+        $group->get('/shelter/stats', function ($request, $response) {
+            $controller = new ShelterController();
+            return $controller->getShelterStats($request, $response);
+        });
+
+        $group->get('/shelter/pets', function ($request, $response) {
+            $controller = new ShelterController();
+            return $controller->getShelterPets($request, $response);
+        });
+
         // Create new shelter
         $group->post('', function ($request, $response) {
             $controller = new ShelterController();
@@ -214,6 +224,22 @@ $app->group('/api', function ($group) {
     $group->delete('/pets/{id}', function ($request, $response, $args) {
         $controller = new PetController();
         return $controller->deletePet($request, $response, $args);
+    });
+
+    $group->post('/pets/submit', function ($request, $response) {
+        $controller = new PetController();
+        return $controller->submitPetForAdoption($request, $response);
+    });
+
+    // Add inside admin routes group
+    $group->get('/admin/pet-submissions', function ($request, $response) {
+        $controller = new PetController();
+        return $controller->getPetSubmissions($request, $response);
+    });
+
+    $group->put('/admin/pet-submissions/{id}', function ($request, $response, $args) {
+        $controller = new PetController();
+        return $controller->reviewPetSubmission($request, $response, $args);
     });
     
     // Pet trait routes

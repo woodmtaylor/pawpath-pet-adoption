@@ -71,6 +71,85 @@ class ShelterService {
         }
     }
 
+    public function getShelterStats(int $userId): array {
+        try {
+            // First get the shelter ID for this staff member
+            $stmt = $this->db->prepare("
+                SELECT shelter_id 
+                FROM ShelterStaff 
+                WHERE user_id = ?
+            ");
+            $stmt->execute([$userId]);
+            $shelterId = $stmt->fetchColumn();
+
+            if (!$shelterId) {
+                throw new \RuntimeException('User is not associated with any shelter');
+            }
+
+            // Get total pets
+            $stmt = $this->db->prepare("
+                SELECT COUNT(*) 
+                FROM Pet 
+                WHERE shelter_id = ?
+            ");
+            $stmt->execute([$shelterId]);
+            $totalPets = (int) $stmt->fetchColumn();
+
+            // Get active applications
+            $stmt = $this->db->prepare("
+                SELECT COUNT(DISTINCT aa.application_id) 
+                FROM Adoption_Application aa
+                JOIN Pet p ON aa.pet_id = p.pet_id
+                WHERE p.shelter_id = ? 
+                AND aa.status IN ('pending', 'under_review')
+            ");
+            $stmt->execute([$shelterId]);
+            $activeApplications = (int) $stmt->fetchColumn();
+
+            // Get adopted pets (approved applications)
+            $stmt = $this->db->prepare("
+                SELECT COUNT(DISTINCT aa.application_id) 
+                FROM Adoption_Application aa
+                JOIN Pet p ON aa.pet_id = p.pet_id
+                WHERE p.shelter_id = ? 
+                AND aa.status = 'approved'
+            ");
+            $stmt->execute([$shelterId]);
+            $adoptedPets = (int) $stmt->fetchColumn();
+
+            return [
+                'shelterId' => $shelterId,
+                'totalPets' => $totalPets,
+                'activeApplications' => $activeApplications,
+                'adoptedPets' => $adoptedPets
+            ];
+        } catch (PDOException $e) {
+            error_log("Error getting shelter stats: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    public function getShelterPets(int $shelterId): array {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT p.*, 
+                       s.name as shelter_name,
+                       COUNT(DISTINCT aa.application_id) as application_count
+                FROM Pet p
+                LEFT JOIN Shelter s ON p.shelter_id = s.shelter_id
+                LEFT JOIN Adoption_Application aa ON p.pet_id = aa.pet_id AND aa.status IN ('pending', 'under_review')
+                WHERE p.shelter_id = ?
+                GROUP BY p.pet_id
+                ORDER BY p.pet_id DESC
+            ");
+            $stmt->execute([$shelterId]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error getting shelter pets: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
     public function getTotalPets(int $shelterId): int {
         try {
             $stmt = $this->db->prepare("
