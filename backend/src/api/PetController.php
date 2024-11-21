@@ -4,27 +4,25 @@ namespace PawPath\api;
 use PawPath\services\PetService;
 use PawPath\services\ImageUploadService;
 use PawPath\models\PetImage;
+use PawPath\config\database\DatabaseConfig;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use PawPath\utils\ResponseHelper;
+use PDO;
 
 class PetController {
     private PetService $petService;
-    private ?ImageUploadService $imageService;
-    private ?PetImage $petImageModel;
+    private ImageUploadService $imageService;
+    private PetImage $petImageModel;
+    private PDO $db;
     
     public function __construct() {
+        $this->db = DatabaseConfig::getConnection();
         $this->petService = new PetService();
-        
-        try {
-            $this->imageService = new ImageUploadService();
-            $this->petImageModel = new PetImage();
-        } catch (\Exception $e) {
-            error_log("Failed to initialize image services: " . $e->getMessage());
-            $this->imageService = null;
-            $this->petImageModel = null;
-        }
-    }   
+        $this->imageService = new ImageUploadService();
+        $this->petImageModel = new PetImage();
+    }
+
     public function createPet(Request $request, Response $response): Response {
         try {
             $data = $request->getParsedBody();
@@ -72,13 +70,23 @@ class PetController {
     public function getPet(Request $request, Response $response, array $args): Response {
         try {
             $petId = (int) $args['id'];
+            
+            // Add debugging for image lookup
+            $stmt = $this->db->prepare("SELECT * FROM Pet_Image WHERE pet_id = ?");
+            $stmt->execute([$petId]);
+            $images = $stmt->fetchAll();
+            error_log("Images for pet $petId: " . print_r($images, true));
+            
             $result = $this->petService->getPet($petId);
+            error_log("Complete pet data: " . print_r($result, true));
+            
             return ResponseHelper::sendResponse($response, $result);
         } catch (\Exception $e) {
+            error_log('Error getting pet: ' . $e->getMessage());
             return ResponseHelper::sendError($response, $e->getMessage(), 404);
         }
     }
-    
+        
     public function listPets(Request $request, Response $response): Response {
         try {
             $queryParams = $request->getQueryParams();
@@ -92,6 +100,7 @@ class PetController {
             $queryParams['limit'] = $perPage;
             
             $result = $this->petService->listPets($queryParams);
+            error_log("Pet list result: " . print_r($result, true));
             
             return ResponseHelper::sendResponse($response, [
                 'items' => $result['pets'],
@@ -99,7 +108,6 @@ class PetController {
                 'page' => $page,
                 'perPage' => $perPage
             ]);
-                
         } catch (\Exception $e) {
             error_log("Error in listPets: " . $e->getMessage());
             return ResponseHelper::sendError($response, $e->getMessage());

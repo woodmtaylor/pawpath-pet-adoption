@@ -19,16 +19,39 @@ api.interceptors.request.use((config) => {
     return Promise.reject(error);
 });
 
-// Add response interceptor for error handling
-api.interceptors.response.use(
-    (response) => response,
-    (error) => {
-        if (error.response?.status === 401) {
-            // Handle unauthorized access
-            window.location.href = '/login';
+// Add response interceptor to handle image URLs
+api.interceptors.response.use((response) => {
+    // Function to process image URLs in an object
+    const processImageUrls = (obj: any) => {
+        if (!obj) return obj;
+        
+        if (Array.isArray(obj)) {
+            return obj.map(item => processImageUrls(item));
         }
-        return Promise.reject(error);
+        
+        if (typeof obj === 'object') {
+            Object.keys(obj).forEach(key => {
+                if (key === 'images' && Array.isArray(obj[key])) {
+                    obj[key] = obj[key].map((image: any) => ({
+                        ...image,
+                        url: `${window.location.origin}${image.url}`
+                    }));
+                } else if (typeof obj[key] === 'object') {
+                    obj[key] = processImageUrls(obj[key]);
+                }
+            });
+        }
+        return obj;
+    };
+
+    // Process the response data
+    if (response.data && response.data.data) {
+        response.data.data = processImageUrls(response.data.data);
     }
-);
+
+    return response;
+}, (error) => {
+    return Promise.reject(error);
+});
 
 export default api;

@@ -1,25 +1,72 @@
 <?php
-// backend/src/services/PetService.php
-
 namespace PawPath\services;
 
-use PawPath\models\Pet;
-use PawPath\models\PetTrait;
-use PawPath\models\Shelter;
-use RuntimeException;
-use PawPath\config\database\DatabaseConfig;
+use PDO;
+use PDOException;
+use PawPath\config\database\DatabaseConfig as DbConfig;  // Use an alias to avoid conflict
 
 class PetService {
-    private $db;
-    private Pet $petModel;
-    private PetTrait $traitModel;
-    private Shelter $shelterModel;
+    private PDO $db;
     
     public function __construct() {
-        $this->db = DatabaseConfig::getConnection();
-        $this->petModel = new Pet();
-        $this->traitModel = new PetTrait();
-        $this->shelterModel = new Shelter();
+        $this->db = DbConfig::getConnection();  // Use the alias here
+    }
+
+    public function getPet(int $id): array {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT p.*, s.name as shelter_name
+                FROM Pet p
+                LEFT JOIN Shelter s ON p.shelter_id = s.shelter_id
+                WHERE p.pet_id = ?
+            ");
+            
+            $stmt->execute([$id]);
+            $pet = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$pet) {
+                throw new \RuntimeException("Pet not found");
+            }
+            
+            // Get images
+            $stmt = $this->db->prepare("
+                SELECT image_id, image_url as url, is_primary
+                FROM Pet_Image
+                WHERE pet_id = ?
+                ORDER BY is_primary DESC, image_id ASC
+            ");
+            $stmt->execute([$id]);
+            $pet['images'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            error_log("Pet data with images: " . print_r($pet, true));
+            
+            // Get traits
+            $stmt = $this->db->prepare("
+                SELECT t.trait_name, tc.name as category
+                FROM Pet_Trait_Relation ptr
+                JOIN Pet_Trait t ON ptr.trait_id = t.trait_id
+                LEFT JOIN Trait_Category tc ON t.category_id = tc.category_id
+                WHERE ptr.pet_id = ?
+            ");
+            $stmt->execute([$id]);
+            $traits = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            $formattedTraits = [];
+            foreach ($traits as $trait) {
+                $category = $trait['category'] ?? 'General';
+                if (!isset($formattedTraits[$category])) {
+                    $formattedTraits[$category] = [];
+                }
+                $formattedTraits[$category][] = $trait['trait_name'];
+            }
+            
+            $pet['traits'] = $formattedTraits;
+            
+            return $pet;
+        } catch (PDOException $e) {
+            error_log("Database error finding pet: " . $e->getMessage());
+            throw new \RuntimeException("Failed to fetch pet data");
+        }
     }
     
     public function createPet(array $data): array {
@@ -126,107 +173,86 @@ class PetService {
         return $this->petModel->delete($id);
     }
     
-    public function getPet(int $id): array {
-        $pet = $this->petModel->findById($id);
-        if (!$pet) {
-            throw new RuntimeException("Pet not found");
-        }
-        return $pet;
-    }
-    
     public function listPets(array $filters = []): array {
         try {
-            // Debug logging
-            error_log("PetService::listPets called with filters: " . print_r($filters, true));
-            
-            // Get total count without pagination
-            $countQuery = "SELECT COUNT(DISTINCT p.pet_id) FROM Pet p";
-            $whereConditions = [];
+            $query = "
+                SELECT p.*, s.name as shelter_name,
+                COUNT(*) OVER() as total_count
+                FROM Pet p
+                LEFT JOIN Shelter s ON p.shelter_id = s.shelter_id
+                WHERE 1=1
+            ";
             $params = [];
             
-            // Build basic query
-            $query = "SELECT DISTINCT p.*, s.name as shelter_name 
-                     FROM Pet p
-                     LEFT JOIN Shelter s ON p.shelter_id = s.shelter_id";
-            
-            // Add search conditions if present
+            // Add filter conditions...
             if (!empty($filters['search'])) {
-                $whereConditions[] = "(p.name LIKE ? OR p.breed LIKE ? OR p.description LIKE ?)";
+                $query .= " AND (p.name LIKE ? OR p.breed LIKE ? OR p.description LIKE ?)";
                 $searchTerm = '%' . $filters['search'] . '%';
                 $params = array_merge($params, [$searchTerm, $searchTerm, $searchTerm]);
             }
             
-            // Add species filter if present
-            if (!empty($filters['species'])) {
-                $whereConditions[] = "p.species = ?";
-                $params[] = $filters['species'];
+            // Add pagination
+            if (isset($filters['limit'])) {
+                $query .= " LIMIT ?";
+                $params[] = (int)$filters['limit'];
+                
+                if (isset($filters['offset'])) {
+                    $query .= " OFFSET ?";
+                    $params[] = (int)$filters['offset'];
+                }
             }
             
-            // Add WHERE clause if conditions exist
-            if (!empty($whereConditions)) {
-                $whereClause = " WHERE " . implode(" AND ", $whereConditions);
-                $countQuery .= $whereClause;
-                $query .= $whereClause;
-            }
-            
-            // Add ORDER BY
-            $query .= " ORDER BY p.pet_id DESC";
-            
-            // Add LIMIT and OFFSET
-            $limit = (int)($filters['limit'] ?? 12);
-            $offset = (int)($filters['offset'] ?? 0);
-            $query .= " LIMIT ? OFFSET ?";
-            
-            // Clone params for count query
-            $countParams = $params;
-            
-            // Add limit and offset to params for main query
-            $params[] = $limit;
-            $params[] = $offset;
-            
-            // Get total count
-            $stmt = $this->db->prepare($countQuery);
-            $stmt->execute($countParams);
-            $total = (int)$stmt->fetchColumn();
-            
-            // Debug logging
-            error_log("Query: " . $query);
-            error_log("Params: " . print_r($params, true));
-            
-            // Get paginated results
             $stmt = $this->db->prepare($query);
             $stmt->execute($params);
-            $pets = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            $pets = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
-            // Fetch traits for each pet
+            $total = $pets[0]['total_count'] ?? 0;
+            
+            // Get images for each pet
             foreach ($pets as &$pet) {
-                $traitQuery = "
+                // Get images
+                $stmt = $this->db->prepare("
+                    SELECT image_id, image_url as url, is_primary
+                    FROM Pet_Image
+                    WHERE pet_id = ?
+                    ORDER BY is_primary DESC, image_id ASC
+                ");
+                $stmt->execute([$pet['pet_id']]);
+                $pet['images'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                // Get traits
+                $stmt = $this->db->prepare("
                     SELECT t.trait_name, tc.name as category
                     FROM Pet_Trait_Relation ptr
                     JOIN Pet_Trait t ON ptr.trait_id = t.trait_id
                     LEFT JOIN Trait_Category tc ON t.category_id = tc.category_id
                     WHERE ptr.pet_id = ?
-                ";
-                
-                $stmt = $this->db->prepare($traitQuery);
+                ");
                 $stmt->execute([$pet['pet_id']]);
-                $traits = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+                $traits = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
-                $pet['traits'] = $this->formatTraits($traits);
+                // Format traits
+                $formattedTraits = [];
+                foreach ($traits as $trait) {
+                    $category = $trait['category'] ?? 'General';
+                    if (!isset($formattedTraits[$category])) {
+                        $formattedTraits[$category] = [];
+                    }
+                    $formattedTraits[$category][] = $trait['trait_name'];
+                }
+                $pet['traits'] = $formattedTraits;
+                
+                // Remove the count from individual pets
+                unset($pet['total_count']);
             }
-            
-            // Debug logging
-            error_log("Found " . count($pets) . " pets");
             
             return [
                 'pets' => $pets,
                 'total' => $total
             ];
-            
-        } catch (\Exception $e) {
-            error_log("Error in PetService::listPets: " . $e->getMessage());
-            error_log("Stack trace: " . $e->getTraceAsString());
-            throw new \RuntimeException("Failed to fetch pets: " . $e->getMessage());
+        } catch (PDOException $e) {
+            error_log("Error in listPets: " . $e->getMessage());
+            throw new \RuntimeException("Failed to fetch pets");
         }
     }
     

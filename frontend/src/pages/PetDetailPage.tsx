@@ -1,145 +1,144 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Heart, MapPin, Phone, Mail, Calendar, Info, PawPrint } from 'lucide-react';
+import { ChevronLeft, Heart, MapPin, Phone, Mail, Calendar, Info, PawPrint, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { Pet } from '@/types/api';
 import api from '@/lib/axios';
 
-interface Pet {
-  pet_id: number;
-  name: string;
-  species: string;
-  breed: string;
-  age: number;
-  gender: string;
-  description: string;
-  shelter_name: string;  // Changed from nested shelter object
-  images?: string[];
-  traits?: {
-    [category: string]: string[];
-  };
-}
-
 function PetDetailPage() {
-  const { id } = useParams();
-  const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
-  const { toast } = useToast();
-  const [pet, setPet] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [isFavorited, setIsFavorited] = useState(false);
-  const [isToggling, setIsToggling] = useState(false);
+    const { id } = useParams();
+    const navigate = useNavigate();
+    const { isAuthenticated } = useAuth();
+    const { toast } = useToast();
+    const [pet, setPet] = useState<Pet | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [isFavorited, setIsFavorited] = useState(false);
+    const [isToggling, setIsToggling] = useState(false);
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);  // Add this line
 
-  useEffect(() => {
-    const fetchPet = async () => {
-      try {
-        setIsLoading(true);
-        const response = await api.get(`/pets/${id}`);
-        if (response.data.success) {
-          setPet(response.data.data);
-          
-          // Check if pet is favorited
-          if (isAuthenticated) {
-            const favResponse = await api.get(`/pets/${id}/favorite`);
-            setIsFavorited(favResponse.data.data.is_favorited);
-          }
-        } else {
-          throw new Error(response.data.error || 'Failed to load pet details');
-        }
-      } catch (err) {
-        const errorMsg = err.response?.data?.error || err.message || 'Failed to load pet details';
-        setError(errorMsg);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: errorMsg,
+    useEffect(() => {
+        const fetchPet = async () => {
+            try {
+                setIsLoading(true);
+                const response = await api.get(`/pets/${id}`);
+                if (response.data.success) {
+                    setPet(response.data.data);
+                    setCurrentImageIndex(0); // Reset image index when pet data changes
+                    
+                    if (isAuthenticated) {
+                        const favResponse = await api.get(`/pets/${id}/favorite`);
+                        setIsFavorited(favResponse.data.data.is_favorited);
+                    }
+                } else {
+                    throw new Error(response.data.error || 'Failed to load pet details');
+                }
+            } catch (err: any) {
+                const errorMsg = err.response?.data?.error || err.message || 'Failed to load pet details';
+                setError(errorMsg);
+                toast({
+                    variant: "destructive",
+                    title: "Error",
+                    description: errorMsg,
+                });
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchPet();
+    }, [id, isAuthenticated, toast]);
+
+    const navigateImage = (direction: 'next' | 'prev') => {
+        if (!pet?.images?.length) return;
+        
+        setCurrentImageIndex(prev => {
+            if (direction === 'next') {
+                return prev === pet.images!.length - 1 ? 0 : prev + 1;
+            } else {
+                return prev === 0 ? pet.images!.length - 1 : prev - 1;
+            }
         });
-      } finally {
-        setIsLoading(false);
-      }
     };
 
-    fetchPet();
-  }, [id, isAuthenticated, toast]);
+    const handleFavoriteToggle = async () => {
+        if (!isAuthenticated) {
+            navigate('/login', { state: { from: `/pets/${id}` } });
+            return;
+        }
 
-  const handleFavoriteToggle = async () => {
-    if (!isAuthenticated) {
-      navigate('/login', { state: { from: `/pets/${id}` } });
-      return;
+        try {
+            setIsToggling(true);
+            if (isFavorited) {
+                await api.delete(`/pets/${id}/favorite`);
+                toast({
+                    title: "Removed from favorites",
+                    description: "Pet has been removed from your favorites",
+                });
+            } else {
+                await api.post(`/pets/${id}/favorite`);
+                toast({
+                    title: "Added to favorites",
+                    description: "Pet has been added to your favorites",
+                });
+            }
+            setIsFavorited(!isFavorited);
+        } catch (err) {
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Failed to update favorites",
+            });
+        } finally {
+            setIsToggling(false);
+        }
+    };
+
+    const handleAdopt = () => {
+        if (!isAuthenticated) {
+            navigate('/login', { state: { from: `/pets/${id}` } });
+            return;
+        }
+        navigate(`/adopt/${id}`);
+    };
+
+    if (isLoading) {
+        return (
+            <div className="container max-w-4xl mx-auto p-4">
+                <div className="h-96 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                </div>
+            </div>
+        );
     }
 
-    try {
-      setIsToggling(true);
-      if (isFavorited) {
-        await api.delete(`/pets/${id}/favorite`);
-        toast({
-          title: "Removed from favorites",
-          description: "Pet has been removed from your favorites",
-        });
-      } else {
-        await api.post(`/pets/${id}/favorite`);
-        toast({
-          title: "Added to favorites",
-          description: "Pet has been added to your favorites",
-        });
-      }
-      setIsFavorited(!isFavorited);
-    } catch (err) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to update favorites",
-      });
-    } finally {
-      setIsToggling(false);
+    if (error || !pet) {
+        return (
+            <div className="container max-w-4xl mx-auto p-4">
+                <Card>
+                    <CardContent className="p-6">
+                        <h2 className="text-lg font-semibold mb-2">Error</h2>
+                        <p className="text-muted-foreground">{error || 'Pet not found'}</p>
+                        <Button
+                            className="mt-4"
+                            variant="outline"
+                            onClick={() => navigate('/pets')}
+                        >
+                            <ChevronLeft className="mr-2 h-4 w-4" />
+                            Back to Pets
+                        </Button>
+                    </CardContent>
+                </Card>
+            </div>
+        );
     }
-  };
 
-  const handleAdopt = () => {
-    if (!isAuthenticated) {
-      navigate('/login', { state: { from: `/pets/${id}` } });
-      return;
-    }
-    navigate(`/adopt/${id}`);
-  };
-
-  if (isLoading) {
     return (
-      <div className="container max-w-4xl mx-auto p-4">
-        <div className="h-96 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !pet) {
-    return (
-      <div className="container max-w-4xl mx-auto p-4">
-        <Card>
-          <CardContent className="p-6">
-            <h2 className="text-lg font-semibold mb-2">Error</h2>
-            <p className="text-muted-foreground">{error || 'Pet not found'}</p>
-            <Button
-              className="mt-4"
-              variant="outline"
-              onClick={() => navigate('/pets')}
-            >
-              <ChevronLeft className="mr-2 h-4 w-4" />
-              Back to Pets
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  return (
-    <div className="container max-w-4xl mx-auto p-4">
+        <div className="container max-w-4xl mx-auto p-4">
       <Button
         variant="ghost"
         className="mb-4"
@@ -150,63 +149,67 @@ function PetDetailPage() {
       </Button>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Image Gallery */}
-                <div className="space-y-4">
-                    <div className="aspect-square relative bg-muted rounded-lg overflow-hidden">
-                        {pet.images && pet.images.length > 0 ? (
-                            <>
-                                <img
-                                    src={pet.images[currentImageIndex].url}
-                                    alt={pet.name}
-                                    className="object-cover w-full h-full"
-                                />
-                                {pet.images.length > 1 && (
-                                    <>
-                                        <Button
-                                            variant="secondary"
-                                            size="icon"
-                                            className="absolute left-2 top-1/2 -translate-y-1/2"
-                                            onClick={() => navigateImage('prev')}
-                                        >
-                                            <ChevronLeft className="h-4 w-4" />
-                                        </Button>
-                                        <Button
-                                            variant="secondary"
-                                            size="icon"
-                                            className="absolute right-2 top-1/2 -translate-y-1/2"
-                                            onClick={() => navigateImage('next')}
-                                        >
-                                            <ChevronRight className="h-4 w-4" />
-                                        </Button>
-                                    </>
-                                )}
-                            </>
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                                <PawPrint className="h-12 w-12 text-muted-foreground" />
-                            </div>
-                        )}
-                    </div>
+      {/* Image Gallery */}
+      <div className="space-y-4">
+          <div className="aspect-square relative bg-muted rounded-lg overflow-hidden">
+              {pet.images && pet.images.length > 0 ? (
+                  <>
+                      <img
+                          src={pet.images[currentImageIndex].url}
+                          alt={`${pet.name} - ${pet.breed}`}
+                          className="w-full h-full object-contain"  // Changed from object-cover
+                          style={{
+                              backgroundColor: 'white',  // Add white background
+                              maxHeight: '600px'        // Limit maximum height
+                          }}
+                      />
+                      {pet.images.length > 1 && (
+                          <>
+                              <Button
+                                  variant="secondary"
+                                  size="icon"
+                                  className="absolute left-2 top-1/2 -translate-y-1/2"
+                                  onClick={() => navigateImage('prev')}
+                              >
+                                  <ChevronLeft className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                  variant="secondary"
+                                  size="icon"
+                                  className="absolute right-2 top-1/2 -translate-y-1/2"
+                                  onClick={() => navigateImage('next')}
+                              >
+                                  <ChevronRight className="h-4 w-4" />
+                              </Button>
+                          </>
+                      )}
+                  </>
+              ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                      <PawPrint className="h-12 w-12 text-muted-foreground" />
+                  </div>
+              )}
+          </div>
 
-                    {/* Thumbnail Grid */}
-                    {pet.images && pet.images.length > 1 && (
-                        <div className="grid grid-cols-4 gap-2">
-                            {pet.images.map((image, index) => (
-                                <button
-                                    key={image.image_id}
-                                    className={`aspect-square rounded-md overflow-hidden border-2 
-                                        ${currentImageIndex === index ? 'border-primary' : 'border-transparent'}`}
-                                    onClick={() => setCurrentImageIndex(index)}
-                                >
-                                    <img
-                                        src={image.url}
-                                        alt={`${pet.name} ${index + 1}`}
-                                        className="object-cover w-full h-full"
-                                    />
-                                </button>
-                            ))}
-                        </div>
-                    )}
+                  {/* Thumbnail Grid */}
+                  {pet.images && pet.images.length > 1 && (
+                      <div className="grid grid-cols-4 gap-2">
+                          {pet.images.map((image, index) => (
+                              <button
+                                  key={image.image_id}
+                                  className={`aspect-square rounded-md overflow-hidden border-2 
+                                      ${currentImageIndex === index ? 'border-primary' : 'border-transparent'}`}
+                                  onClick={() => setCurrentImageIndex(index)}
+                              >
+                                  <img
+                                      src={image.url}
+                                      alt={`${pet.name} ${index + 1}`}
+                                      className="w-full h-full object-contain bg-white"
+                                  />
+                              </button>
+                          ))}
+                      </div>
+                  )}
                 </div>
         {/* Pet Details */}
         <div className="space-y-6">
