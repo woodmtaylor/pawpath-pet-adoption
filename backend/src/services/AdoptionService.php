@@ -1,146 +1,153 @@
 <?php
-// backend/src/services/AdoptionService.php
-
 namespace PawPath\services;
 
-use PawPath\models\AdoptionApplication;
-use PawPath\models\Pet;
-use PawPath\models\User;
-use RuntimeException;
+use PDO;
+use PDOException;
+use PawPath\config\database\DatabaseConfig;
 
 class AdoptionService {
-    private AdoptionApplication $applicationModel;
-    private Pet $petModel;
-    private User $userModel;
+    private PDO $db;
     
     public function __construct() {
-        $this->applicationModel = new AdoptionApplication();
-        $this->petModel = new Pet();
-        $this->userModel = new User();
+        try {
+            $this->db = DatabaseConfig::getConnection();
+        } catch (\Exception $e) {
+            error_log("Error initializing AdoptionService: " . $e->getMessage());
+            throw $e;
+        }
     }
-    
 
     public function createApplication(array $data): array {
         try {
-            // Verify required fields
-            if (!isset($data['user_id']) || !isset($data['pet_id'])) {
-                throw new RuntimeException("User ID and Pet ID are required");
+            $this->db->beginTransaction();
+            
+            $stmt = $this->db->prepare("
+                INSERT INTO Adoption_Application (
+                    user_id, 
+                    pet_id, 
+                    status,
+                    reason,
+                    experience,
+                    living_situation,
+                    has_other_pets,
+                    other_pets_details,
+                    daily_schedule,
+                    veterinarian
+                ) VALUES (
+                    :user_id,
+                    :pet_id,
+                    'pending',
+                    :reason,
+                    :experience,
+                    :living_situation,
+                    :has_other_pets,
+                    :other_pets_details,
+                    :daily_schedule,
+                    :veterinarian
+                )
+            ");
+
+            $result = $stmt->execute([
+                ':user_id' => $data['user_id'],
+                ':pet_id' => $data['pet_id'],
+                ':reason' => $data['reason'] ?? null,
+                ':experience' => $data['experience'] ?? null,
+                ':living_situation' => $data['living_situation'] ?? null,
+                ':has_other_pets' => $data['has_other_pets'] ?? false,
+                ':other_pets_details' => $data['other_pets_details'] ?? null,
+                ':daily_schedule' => $data['daily_schedule'] ?? null,
+                ':veterinarian' => $data['veterinarian'] ?? null
+            ]);
+
+            if (!$result) {
+                throw new \Exception("Failed to create application");
             }
 
-            // Verify user exists
-            $user = $this->userModel->findById($data['user_id']);
-            if (!$user) {
-                throw new RuntimeException("User not found");
-            }
-            
-            // Verify pet exists
-            $pet = $this->petModel->findById($data['pet_id']);
-            if (!$pet) {
-                throw new RuntimeException("Pet not found");
-            }
-            
-            // Check if user has already applied for this pet
-            if ($this->applicationModel->hasUserAppliedForPet($data['user_id'], $data['pet_id'])) {
-                throw new RuntimeException("You have already applied to adopt this pet");
-            }
-            
-            // Create application with all provided fields
-            $applicationData = [
-                'user_id' => $data['user_id'],
-                'pet_id' => $data['pet_id'],
-                'status' => 'pending',
-                'application_date' => date('Y-m-d'),
-                'reason' => $data['reason'] ?? null,
-                'experience' => $data['experience'] ?? null,
-                'living_situation' => $data['living_situation'] ?? null,
-                'has_other_pets' => $data['has_other_pets'] ?? false,
-                'other_pets_details' => $data['other_pets_details'] ?? null,
-                'daily_schedule' => $data['daily_schedule'] ?? null,
-                'veterinarian' => $data['veterinarian'] ?? null,
-                'status_history' => json_encode([
-                    [
-                        'status' => 'pending',
-                        'date' => date('Y-m-d H:i:s'),
-                        'note' => 'Application submitted'
-                    ]
-                ])
-            ];
-            
-            // Create application
-            $applicationId = $this->applicationModel->create($applicationData);
-            
-            // Get and format the created application
-            $application = $this->applicationModel->findById($applicationId);
-            if (!$application) {
-                throw new RuntimeException("Failed to create application");
-            }
+            $applicationId = $this->db->lastInsertId();
+            $this->db->commit();
 
-            return [
-                'success' => true,
-                'data' => $application
-            ];
-            
+            return $this->getApplication($applicationId);
         } catch (\Exception $e) {
+            $this->db->rollBack();
             error_log("Error in createApplication: " . $e->getMessage());
             throw $e;
         }
     }
-    
+
+    public function getApplication(int $applicationId): array {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT 
+                    aa.*,
+                    p.name as pet_name,
+                    p.species as pet_species,
+                    p.breed as pet_breed,
+                    s.name as shelter_name
+                FROM Adoption_Application aa
+                JOIN Pet p ON aa.pet_id = p.pet_id
+                JOIN Shelter s ON p.shelter_id = s.shelter_id
+                WHERE aa.application_id = ?
+            ");
+            
+            $stmt->execute([$applicationId]);
+            $application = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$application) {
+                throw new \Exception("Application not found");
+            }
+            
+            return $application;
+        } catch (\Exception $e) {
+            error_log("Error in getApplication: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
     public function getUserApplications(int $userId): array {
-        // Verify user exists
-        $user = $this->userModel->findById($userId);
-        if (!$user) {
-            throw new RuntimeException("User not found");
+        try {
+            $stmt = $this->db->prepare("
+                SELECT 
+                    aa.*,
+                    p.name as pet_name,
+                    p.species as pet_species,
+                    p.breed as pet_breed,
+                    s.name as shelter_name
+                FROM Adoption_Application aa
+                JOIN Pet p ON aa.pet_id = p.pet_id
+                JOIN Shelter s ON p.shelter_id = s.shelter_id
+                WHERE aa.user_id = ?
+                ORDER BY aa.application_date DESC
+            ");
+            
+            $stmt->execute([$userId]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {
+            error_log("Error in getUserApplications: " . $e->getMessage());
+            throw $e;
         }
-        
-        return $this->applicationModel->findByUser($userId);
     }
-    
-    public function getShelterApplications(int $shelterId): array {
-        return $this->applicationModel->findByShelter($shelterId);
-    }
-    
-    public function getApplication(int $applicationId): ?array {
-        $application = $this->applicationModel->findById($applicationId);
-        if (!$application) {
-            throw new RuntimeException("Application not found");
+
+    public function updateApplicationStatus(int $applicationId, string $status): bool {
+        try {
+            $validStatuses = ['pending', 'under_review', 'approved', 'rejected', 'withdrawn'];
+            if (!in_array($status, $validStatuses)) {
+                throw new \Exception("Invalid status");
+            }
+
+            $stmt = $this->db->prepare("
+                UPDATE Adoption_Application 
+                SET status = :status,
+                    last_updated = CURRENT_TIMESTAMP
+                WHERE application_id = :application_id
+            ");
+
+            return $stmt->execute([
+                ':status' => $status,
+                ':application_id' => $applicationId
+            ]);
+        } catch (\Exception $e) {
+            error_log("Error in updateApplicationStatus: " . $e->getMessage());
+            throw $e;
         }
-        return $application;
-    }
-    
-    public function updateApplicationStatus(int $applicationId, string $status): array {
-        // Verify application exists
-        $application = $this->applicationModel->findById($applicationId);
-        if (!$application) {
-            throw new RuntimeException("Application not found");
-        }
-        
-        // Validate status
-        $validStatuses = [
-            AdoptionApplication::STATUS_PENDING,
-            AdoptionApplication::STATUS_UNDER_REVIEW,
-            AdoptionApplication::STATUS_APPROVED,
-            AdoptionApplication::STATUS_REJECTED,
-            AdoptionApplication::STATUS_WITHDRAWN
-        ];
-        
-        if (!in_array($status, $validStatuses)) {
-            throw new RuntimeException("Invalid application status");
-        }
-        
-        // Update status
-        $this->applicationModel->updateStatus($applicationId, $status);
-        
-        return $this->applicationModel->findById($applicationId);
-    }
-    
-    public function getPetApplications(int $petId): array {
-        // Verify pet exists
-        $pet = $this->petModel->findById($petId);
-        if (!$pet) {
-            throw new RuntimeException("Pet not found");
-        }
-        
-        return $this->applicationModel->findByPet($petId);
     }
 }

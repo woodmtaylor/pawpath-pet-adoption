@@ -99,6 +99,15 @@ class PetController {
             $queryParams['offset'] = $offset;
             $queryParams['limit'] = $perPage;
             
+            // Add sorting parameters
+            $sortBy = $queryParams['sortBy'] ?? 'newest';
+            $queryParams['sort'] = match($sortBy) {
+                'oldest' => 'created_at ASC',
+                'name_asc' => 'name ASC',
+                'name_desc' => 'name DESC',
+                default => 'updated_at DESC', // 'newest' is the default
+            };
+            
             $result = $this->petService->listPets($queryParams);
             error_log("Pet list result: " . print_r($result, true));
             

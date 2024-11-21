@@ -3,6 +3,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { RoleProtectedRoute } from '@/components/auth/RoleProtectedRoute';
 import Navbar from './components/layout/Navbar';
+import ApplicationDetailPage from './pages/profile/ApplicationDetailPage';
 
 // Page Imports
 import HomePage from './pages/HomePage';
@@ -97,6 +98,7 @@ function App() {
                     <Route path="/" element={<ProfilePage />} />
                     <Route path="/settings" element={<ProfileSettings />} />
                     <Route path="/applications" element={<ApplicationsPage />} />
+                    <Route path="/applications/:id" element={<ApplicationDetailPage />} />
                     <Route path="/favorites" element={<FavoritesPage />} />
                   </Routes>
                 </ProtectedRoute>

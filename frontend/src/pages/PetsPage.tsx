@@ -10,8 +10,15 @@ import api from '@/lib/axios';
 import { Pet, ApiResponse, PaginatedResponse } from '@/types/api';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 
-interface PetFiltersState {
+interface PetFilters {
     species?: string;
     breed?: string;
     ageMin?: number;
@@ -20,16 +27,13 @@ interface PetFiltersState {
     size?: string;
     goodWith?: string[];
     traits?: string[];
+    sortBy?: string;
 }
 
-interface TraitResponse {
-    success: boolean;
-    data: {
-        traits: Array<{
-            trait_id: number;
-            trait_name: string;
-        }>;
-    };
+interface PetFiltersProps {
+    onFiltersChange: (filters: PetFilters) => void;
+    initialFilters?: PetFilters;
+    availableTraits: string[];
 }
 
 function PetsPage() {
@@ -39,7 +43,7 @@ function PetsPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
-    const [filters, setFilters] = useState<PetFiltersState>({});
+    const [filters, setFilters] = useState<PetFilters>({});
     const [availableTraits, setAvailableTraits] = useState<string[]>([]);
     const [totalPages, setTotalPages] = useState(1);
     const { toast } = useToast();
@@ -48,7 +52,7 @@ function PetsPage() {
     const currentPage = parseInt(searchParams.get('page') || '1', 10);
     const perPage = 12;
 
-    const updateUrlParams = useCallback((page: number, search: string, currentFilters: PetFiltersState) => {
+    const updateUrlParams = useCallback((page: number, search: string, currentFilters: PetFilters) => {
         const newParams = new URLSearchParams(searchParams);
         
         if (page > 1) newParams.set('page', page.toString());
@@ -73,83 +77,70 @@ function PetsPage() {
         setSearchParams(newParams);
     }, [setSearchParams, searchParams]);
 
-    // Authentication check
+    // Effect for authentication check
     useEffect(() => {
         if (!isAuthenticated) {
             navigate('/login', { state: { from: '/pets' } });
         }
     }, [isAuthenticated, navigate]);
 
-    // Fetch available traits
+    // Effect for fetching pets
     useEffect(() => {
-        const fetchTraits = async () => {
-            try {
-                const response = await api.get<TraitResponse>('/pet-traits');
-                if (response.data.success && response.data.data.traits) {
-                    setAvailableTraits(response.data.data.traits.map(trait => trait.trait_name));
+        if (isAuthenticated) {
+            fetchPets();
+        }
+    }, [currentPage, searchTerm, filters, isAuthenticated]);
+
+    const fetchPets = async () => {
+        try {
+            setLoading(true);
+            const response = await api.get<ApiResponse<PaginatedResponse<Pet>>>('/pets', { 
+                params: {
+                    page: currentPage,
+                    perPage,
+                    offset: (currentPage - 1) * perPage,
+                    search: searchTerm,
+                    sortBy: filters.sortBy || 'newest',
+                    ...filters
                 }
-            } catch (err) {
-                console.error('Failed to fetch traits:', err);
-            }
-        };
+            });
 
-        fetchTraits();
-    }, []);
-
-    // Fetch pets with pagination
-    useEffect(() => {
-        const fetchPets = async () => {
-            if (!isAuthenticated) return;
-            
-            try {
-                setLoading(true);
-                setError(null);
-
-                const offset = (currentPage - 1) * perPage;
-
-                const response = await api.get<ApiResponse<PaginatedResponse<Pet>>>('/pets', { 
-                    params: {
-                        page: currentPage,
-                        perPage,
-                        offset,
-                        search: searchTerm,
-                        ...filters
-                    }
-                });
-
-                if (response.data.success) {
-                    setPets(response.data.data.items);
-                    const newTotalPages = Math.ceil(response.data.data.total / perPage);
-                    setTotalPages(newTotalPages);
-                    
-                    if (currentPage > newTotalPages && newTotalPages > 0) {
-                        updateUrlParams(1, searchTerm, filters);
-                    }
-                } else {
-                    throw new Error(response.data.error || 'Failed to fetch pets');
+            if (response.data.success) {
+                setPets(response.data.data.items);
+                const newTotalPages = Math.ceil(response.data.data.total / perPage);
+                setTotalPages(newTotalPages);
+                
+                if (currentPage > newTotalPages && newTotalPages > 0) {
+                    updateUrlParams(1, searchTerm, filters);
                 }
-            } catch (err: any) {
-                const errorMessage = err.response?.data?.error || err.message || 'Failed to fetch pets';
-                setError(errorMessage);
-                toast({
-                    variant: "destructive",
-                    title: "Error",
-                    description: errorMessage,
-                });
-            } finally {
-                setLoading(false);
+            } else {
+                throw new Error(response.data.error || 'Failed to fetch pets');
             }
-        };
-
-        fetchPets();
-    }, [currentPage, searchTerm, filters, toast, updateUrlParams, isAuthenticated]);
+        } catch (err: any) {
+            const errorMessage = err.response?.data?.error || err.message || 'Failed to fetch pets';
+            setError(errorMessage);
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: errorMessage,
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleSearch = (event: React.FormEvent) => {
         event.preventDefault();
         updateUrlParams(1, searchTerm, filters);
     };
 
-    const handleFilterChange = (newFilters: PetFiltersState) => {
+    const handleFilterChange = (newFilters: PetFilters) => {
+        setFilters(newFilters);
+        updateUrlParams(1, searchTerm, newFilters);
+    };
+
+    const handleSortChange = (value: string) => {
+        const newFilters = { ...filters, sortBy: value };
         setFilters(newFilters);
         updateUrlParams(1, searchTerm, newFilters);
     };
@@ -233,6 +224,16 @@ function PetsPage() {
         );
     };
 
+    if (loading) {
+        return (
+            <div className="container max-w-4xl mx-auto p-4">
+                <div className="flex justify-center items-center min-h-[400px]">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="container mx-auto p-4">
             <div className="mb-8 space-y-4">
@@ -255,11 +256,27 @@ function PetsPage() {
                             />
                         </div>
                     </form>
-                    <PetFilters
-                        onFiltersChange={handleFilterChange}
-                        initialFilters={filters}
-                        availableTraits={availableTraits}
-                    />
+                    <div className="flex gap-2">
+                        <Select
+                            value={filters.sortBy || 'newest'}
+                            onValueChange={handleSortChange}
+                        >
+                            <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Sort by" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="newest">Newest First</SelectItem>
+                                <SelectItem value="oldest">Oldest First</SelectItem>
+                                <SelectItem value="name_asc">Name (A-Z)</SelectItem>
+                                <SelectItem value="name_desc">Name (Z-A)</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <PetFilters
+                            onFiltersChange={handleFilterChange}
+                            initialFilters={filters}
+                            availableTraits={availableTraits}
+                        />
+                    </div>
                 </div>
             </div>
 
@@ -271,11 +288,7 @@ function PetsPage() {
                 </Card>
             )}
 
-            {loading ? (
-                <div className="flex justify-center items-center min-h-[400px]">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-                </div>
-            ) : pets.length === 0 ? (
+            {pets.length === 0 ? (
                 <Card>
                     <CardContent className="p-6 text-center">
                         <PawPrint className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />

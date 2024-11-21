@@ -175,6 +175,11 @@ class PetService {
     
     public function listPets(array $filters = []): array {
         try {
+            // First check if updated_at column exists
+            $columns = $this->db->query("SHOW COLUMNS FROM Pet")->fetchAll(PDO::FETCH_COLUMN);
+            $hasUpdatedAt = in_array('updated_at', $columns);
+            $hasCreatedAt = in_array('created_at', $columns);
+
             $query = "
                 SELECT p.*, s.name as shelter_name,
                 COUNT(*) OVER() as total_count
@@ -189,6 +194,45 @@ class PetService {
                 $query .= " AND (p.name LIKE ? OR p.breed LIKE ? OR p.description LIKE ?)";
                 $searchTerm = '%' . $filters['search'] . '%';
                 $params = array_merge($params, [$searchTerm, $searchTerm, $searchTerm]);
+            }
+
+            // Add sorting based on available columns
+            if (!empty($filters['sort'])) {
+                switch($filters['sort']) {
+                    case 'updated_at DESC':
+                        $query .= $hasUpdatedAt 
+                            ? " ORDER BY p.updated_at DESC" 
+                            : ($hasCreatedAt 
+                                ? " ORDER BY p.created_at DESC" 
+                                : " ORDER BY p.pet_id DESC");
+                        break;
+                    case 'updated_at ASC':
+                        $query .= $hasUpdatedAt 
+                            ? " ORDER BY p.updated_at ASC" 
+                            : ($hasCreatedAt 
+                                ? " ORDER BY p.created_at ASC" 
+                                : " ORDER BY p.pet_id ASC");
+                        break;
+                    case 'name ASC':
+                        $query .= " ORDER BY p.name ASC";
+                        break;
+                    case 'name DESC':
+                        $query .= " ORDER BY p.name DESC";
+                        break;
+                    default:
+                        $query .= $hasUpdatedAt 
+                            ? " ORDER BY p.updated_at DESC" 
+                            : ($hasCreatedAt 
+                                ? " ORDER BY p.created_at DESC" 
+                                : " ORDER BY p.pet_id DESC");
+                }
+            } else {
+                // Default sorting
+                $query .= $hasUpdatedAt 
+                    ? " ORDER BY p.updated_at DESC" 
+                    : ($hasCreatedAt 
+                        ? " ORDER BY p.created_at DESC" 
+                        : " ORDER BY p.pet_id DESC");
             }
             
             // Add pagination
@@ -208,7 +252,7 @@ class PetService {
             
             $total = $pets[0]['total_count'] ?? 0;
             
-            // Get images for each pet
+            // Get images and traits for each pet
             foreach ($pets as &$pet) {
                 // Get images
                 $stmt = $this->db->prepare("
@@ -232,15 +276,7 @@ class PetService {
                 $traits = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
                 // Format traits
-                $formattedTraits = [];
-                foreach ($traits as $trait) {
-                    $category = $trait['category'] ?? 'General';
-                    if (!isset($formattedTraits[$category])) {
-                        $formattedTraits[$category] = [];
-                    }
-                    $formattedTraits[$category][] = $trait['trait_name'];
-                }
-                $pet['traits'] = $formattedTraits;
+                $pet['traits'] = $this->formatTraits($traits);
                 
                 // Remove the count from individual pets
                 unset($pet['total_count']);
@@ -255,7 +291,7 @@ class PetService {
             throw new \RuntimeException("Failed to fetch pets");
         }
     }
-    
+
     public function addTrait(string $traitName): array {
         // Validate trait name
         if (empty(trim($traitName))) {
