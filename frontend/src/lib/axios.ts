@@ -2,7 +2,7 @@ import axios from 'axios';
 import { getStoredToken } from '@/stores/auth';
 
 const api = axios.create({
-    baseURL: '/api',
+    baseURL: '/api', // This will be prepended to all requests
     headers: {
         'Content-Type': 'application/json',
     },

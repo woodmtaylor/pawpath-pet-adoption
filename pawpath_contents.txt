@@ -381,6 +381,15 @@ class PetController {
             $queryParams['offset'] = $offset;
             $queryParams['limit'] = $perPage;
             
+            // Add sorting parameters
+            $sortBy = $queryParams['sortBy'] ?? 'newest';
+            $queryParams['sort'] = match($sortBy) {
+                'oldest' => 'created_at ASC',
+                'name_asc' => 'name ASC',
+                'name_desc' => 'name DESC',
+                default => 'updated_at DESC', // 'newest' is the default
+            };
+            
             $result = $this->petService->listPets($queryParams);
             error_log("Pet list result: " . print_r($result, true));
             
@@ -1068,149 +1077,86 @@ class ProductController {
 }
 === ./backend/src/api/ShelterController.php ===
 <?php
-// backend/src/api/ShelterController.php
-
 namespace PawPath\api;
 
 use PawPath\services\ShelterService;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
+use PawPath\utils\ResponseHelper;
 
 class ShelterController {
     private ShelterService $shelterService;
     
     public function __construct() {
-        $this->shelterService = new ShelterService();
-    }
-    
-    public function createShelter(Request $request, Response $response): Response {
         try {
-            $data = $request->getParsedBody();
-            error_log('Creating shelter with data: ' . print_r($data, true));
-            
-            if (!is_array($data)) {
-                $body = (string) $request->getBody();
-                $data = json_decode($body, true);
-                
-                if (json_last_error() !== JSON_ERROR_NONE) {
-                    throw new \RuntimeException('Invalid JSON data provided');
-                }
-            }
-            
-            $result = $this->shelterService->createShelter($data);
-            
-            $response->getBody()->write(json_encode($result));
-            return $response->withHeader('Content-Type', 'application/json')
-                           ->withStatus(201);
+            $this->shelterService = new ShelterService();
         } catch (\Exception $e) {
-            error_log('Error creating shelter: ' . $e->getMessage());
-            
-            $response->getBody()->write(json_encode([
-                'error' => $e->getMessage()
-            ]));
-            return $response->withHeader('Content-Type', 'application/json')
-                           ->withStatus(400);
+            error_log("Error initializing ShelterController: " . $e->getMessage());
+            throw $e;
         }
     }
-    
+
     public function getShelter(Request $request, Response $response, array $args): Response {
         try {
+            error_log("Getting shelter with ID: " . $args['id']);
+            
             $shelterId = (int) $args['id'];
-            $result = $this->shelterService->getShelter($shelterId);
+            $shelter = $this->shelterService->getShelter($shelterId);
             
-            $response->getBody()->write(json_encode($result));
-            return $response->withHeader('Content-Type', 'application/json');
+            if (!$shelter) {
+                error_log("Shelter not found: " . $shelterId);
+                return ResponseHelper::sendError(
+                    $response,
+                    "Shelter not found",
+                    404
+                );
+            }
+            
+            // Add additional shelter information
+            $shelter['total_pets'] = $this->shelterService->getTotalPets($shelterId);
+            $shelter['active_applications'] = $this->shelterService->getActiveApplications($shelterId);
+            
+            error_log("Found shelter: " . json_encode($shelter));
+            return ResponseHelper::sendResponse($response, $shelter);
+            
         } catch (\Exception $e) {
-            error_log('Error getting shelter: ' . $e->getMessage());
-            
-            $response->getBody()->write(json_encode([
-                'error' => $e->getMessage()
-            ]));
-            return $response->withHeader('Content-Type', 'application/json')
-                           ->withStatus(404);
+            error_log("Error in getShelter: " . $e->getMessage());
+            error_log("Stack trace: " . $e->getTraceAsString());
+            return ResponseHelper::sendError($response, $e->getMessage());
         }
     }
     
     public function listShelters(Request $request, Response $response): Response {
         try {
+            error_log("Listing shelters");
+            
             $queryParams = $request->getQueryParams();
-            $filters = [];
+            error_log("Query params: " . print_r($queryParams, true));
             
-            // Handle search parameter
-            if (!empty($queryParams['search'])) {
-                $filters['search'] = $queryParams['search'];
+            $filters = [
+                'search' => $queryParams['search'] ?? null,
+                'is_no_kill' => isset($queryParams['is_no_kill']) ? 
+                    filter_var($queryParams['is_no_kill'], FILTER_VALIDATE_BOOLEAN) : null
+            ];
+            
+            $shelters = $this->shelterService->listShelters($filters);
+            
+            // Add additional information for each shelter
+            foreach ($shelters as &$shelter) {
+                $shelter['total_pets'] = $this->shelterService->getTotalPets($shelter['shelter_id']);
+                $shelter['active_applications'] = $this->shelterService->getActiveApplications($shelter['shelter_id']);
             }
             
-            // Handle no-kill filter
-            if (isset($queryParams['is_no_kill'])) {
-                $filters['is_no_kill'] = (bool) $queryParams['is_no_kill'];
-            }
-            
-            $result = $this->shelterService->listShelters($filters);
-            
-            $response->getBody()->write(json_encode($result));
-            return $response->withHeader('Content-Type', 'application/json');
+            return ResponseHelper::sendResponse($response, $shelters);
         } catch (\Exception $e) {
-            error_log('Error listing shelters: ' . $e->getMessage());
-            
-            $response->getBody()->write(json_encode([
-                'error' => $e->getMessage()
-            ]));
-            return $response->withHeader('Content-Type', 'application/json')
-                           ->withStatus(500);
-        }
-    }
-    
-    public function updateShelter(Request $request, Response $response, array $args): Response {
-        try {
-            $shelterId = (int) $args['id'];
-            $data = $request->getParsedBody();
-            
-            if (!is_array($data)) {
-                $body = (string) $request->getBody();
-                $data = json_decode($body, true);
-                
-                if (json_last_error() !== JSON_ERROR_NONE) {
-                    throw new \RuntimeException('Invalid JSON data provided');
-                }
-            }
-            
-            $result = $this->shelterService->updateShelter($shelterId, $data);
-            
-            $response->getBody()->write(json_encode($result));
-            return $response->withHeader('Content-Type', 'application/json');
-        } catch (\Exception $e) {
-            error_log('Error updating shelter: ' . $e->getMessage());
-            
-            $response->getBody()->write(json_encode([
-                'error' => $e->getMessage()
-            ]));
-            return $response->withHeader('Content-Type', 'application/json')
-                           ->withStatus(400);
-        }
-    }
-    
-    public function deleteShelter(Request $request, Response $response, array $args): Response {
-        try {
-            $shelterId = (int) $args['id'];
-            $this->shelterService->deleteShelter($shelterId);
-            
-            return $response->withStatus(204);
-        } catch (\Exception $e) {
-            error_log('Error deleting shelter: ' . $e->getMessage());
-            
-            $response->getBody()->write(json_encode([
-                'error' => $e->getMessage()
-            ]));
-            return $response->withHeader('Content-Type', 'application/json')
-                           ->withStatus(400);
+            error_log("Error in listShelters: " . $e->getMessage());
+            error_log("Stack trace: " . $e->getTraceAsString());
+            return ResponseHelper::sendError($response, $e->getMessage());
         }
     }
 }
 === ./backend/src/api/AdoptionController.php ===
 <?php
-// backend/src/api/AdoptionController.php
-
 namespace PawPath\api;
 
 use PawPath\utils\ResponseHelper;
@@ -1224,40 +1170,32 @@ class AdoptionController {
     public function __construct() {
         $this->adoptionService = new AdoptionService();
     }
-    
-    public function submitApplication(Request $request, Response $response): Response {
+
+    public function getApplication(Request $request, Response $response, array $args): Response {
         try {
+            $applicationId = (int) $args['id'];
             $userId = $request->getAttribute('user_id');
-            $data = $request->getParsedBody();
             
-            if (!isset($data['pet_id'])) {
-                throw new \RuntimeException('pet_id is required');
+            error_log("Fetching application ID: $applicationId for user: $userId");
+            
+            $application = $this->adoptionService->getApplication($applicationId);
+            
+            // Check if user has permission to view this application
+            if ($application['user_id'] !== $userId) {
+                return ResponseHelper::sendError(
+                    $response,
+                    "Unauthorized to view this application",
+                    403
+                );
             }
-            
-            // Add application details to the database
-            $result = $this->adoptionService->createApplication([
-                'user_id' => $userId,
-                'pet_id' => (int) $data['pet_id'],
-                'reason' => $data['reason'] ?? null,
-                'experience' => $data['experience'] ?? null,
-                'living_situation' => $data['living_situation'] ?? null,
-                'has_other_pets' => $data['has_other_pets'] ?? false,
-                'other_pets_details' => $data['other_pets_details'] ?? null,
-                'daily_schedule' => $data['daily_schedule'] ?? null,
-                'veterinarian' => $data['veterinarian'] ?? null,
-                'status' => 'pending'
-            ]);
-            
-            return ResponseHelper::sendResponse($response, $result, 201);
+
+            return ResponseHelper::sendResponse($response, $application);
         } catch (\Exception $e) {
-            return ResponseHelper::sendError(
-                $response, 
-                $e->getMessage(),
-                400
-            );
+            error_log("Error in getApplication: " . $e->getMessage());
+            return ResponseHelper::sendError($response, $e->getMessage(), 500);
         }
     }
-    
+
     public function getUserApplications(Request $request, Response $response): Response {
         try {
             $userId = $request->getAttribute('user_id');
@@ -1265,89 +1203,8 @@ class AdoptionController {
             
             return ResponseHelper::sendResponse($response, $applications);
         } catch (\Exception $e) {
-            error_log('Error getting user applications: ' . $e->getMessage());
-            return ResponseHelper::sendError($response, $e->getMessage());
-        }
-    }
-    
-    public function getShelterApplications(Request $request, Response $response, array $args): Response {
-        try {
-            $shelterId = (int) $args['shelter_id'];
-            $result = $this->adoptionService->getShelterApplications($shelterId);
-            
-            $response->getBody()->write(json_encode($result));
-            return $response->withHeader('Content-Type', 'application/json');
-        } catch (\Exception $e) {
-            error_log('Error getting shelter applications: ' . $e->getMessage());
-            
-            $response->getBody()->write(json_encode([
-                'error' => $e->getMessage()
-            ]));
-            return $response->withHeader('Content-Type', 'application/json')
-                           ->withStatus(400);
-        }
-    }
-    
-    public function getApplication(Request $request, Response $response, array $args): Response {
-        try {
-            $applicationId = (int) $args['id'];
-            $result = $this->adoptionService->getApplication($applicationId);
-            
-            $response->getBody()->write(json_encode($result));
-            return $response->withHeader('Content-Type', 'application/json');
-        } catch (\Exception $e) {
-            error_log('Error getting application: ' . $e->getMessage());
-            
-            $response->getBody()->write(json_encode([
-                'error' => $e->getMessage()
-            ]));
-            return $response->withHeader('Content-Type', 'application/json')
-                           ->withStatus(404);
-        }
-    }
-    
-    public function updateApplicationStatus(Request $request, Response $response, array $args): Response {
-        try {
-            $applicationId = (int) $args['id'];
-            $data = $request->getParsedBody();
-            
-            if (!isset($data['status'])) {
-                throw new \RuntimeException('status is required');
-            }
-            
-            $result = $this->adoptionService->updateApplicationStatus(
-                $applicationId,
-                $data['status']
-            );
-            
-            $response->getBody()->write(json_encode($result));
-            return $response->withHeader('Content-Type', 'application/json');
-        } catch (\Exception $e) {
-            error_log('Error updating application status: ' . $e->getMessage());
-            
-            $response->getBody()->write(json_encode([
-                'error' => $e->getMessage()
-            ]));
-            return $response->withHeader('Content-Type', 'application/json')
-                           ->withStatus(400);
-        }
-    }
-    
-    public function getPetApplications(Request $request, Response $response, array $args): Response {
-        try {
-            $petId = (int) $args['pet_id'];
-            $result = $this->adoptionService->getPetApplications($petId);
-            
-            $response->getBody()->write(json_encode($result));
-            return $response->withHeader('Content-Type', 'application/json');
-        } catch (\Exception $e) {
-            error_log('Error getting pet applications: ' . $e->getMessage());
-            
-            $response->getBody()->write(json_encode([
-                'error' => $e->getMessage()
-            ]));
-            return $response->withHeader('Content-Type', 'application/json')
-                           ->withStatus(400);
+            error_log("Error in getUserApplications: " . $e->getMessage());
+            return ResponseHelper::sendError($response, $e->getMessage(), 500);
         }
     }
 }
@@ -3706,149 +3563,156 @@ class ImageUploadService {
 }
 === ./backend/src/services/AdoptionService.php ===
 <?php
-// backend/src/services/AdoptionService.php
-
 namespace PawPath\services;
 
-use PawPath\models\AdoptionApplication;
-use PawPath\models\Pet;
-use PawPath\models\User;
-use RuntimeException;
+use PDO;
+use PDOException;
+use PawPath\config\database\DatabaseConfig;
 
 class AdoptionService {
-    private AdoptionApplication $applicationModel;
-    private Pet $petModel;
-    private User $userModel;
+    private PDO $db;
     
     public function __construct() {
-        $this->applicationModel = new AdoptionApplication();
-        $this->petModel = new Pet();
-        $this->userModel = new User();
+        try {
+            $this->db = DatabaseConfig::getConnection();
+        } catch (\Exception $e) {
+            error_log("Error initializing AdoptionService: " . $e->getMessage());
+            throw $e;
+        }
     }
-    
 
     public function createApplication(array $data): array {
         try {
-            // Verify required fields
-            if (!isset($data['user_id']) || !isset($data['pet_id'])) {
-                throw new RuntimeException("User ID and Pet ID are required");
+            $this->db->beginTransaction();
+            
+            $stmt = $this->db->prepare("
+                INSERT INTO Adoption_Application (
+                    user_id, 
+                    pet_id, 
+                    status,
+                    reason,
+                    experience,
+                    living_situation,
+                    has_other_pets,
+                    other_pets_details,
+                    daily_schedule,
+                    veterinarian
+                ) VALUES (
+                    :user_id,
+                    :pet_id,
+                    'pending',
+                    :reason,
+                    :experience,
+                    :living_situation,
+                    :has_other_pets,
+                    :other_pets_details,
+                    :daily_schedule,
+                    :veterinarian
+                )
+            ");
+
+            $result = $stmt->execute([
+                ':user_id' => $data['user_id'],
+                ':pet_id' => $data['pet_id'],
+                ':reason' => $data['reason'] ?? null,
+                ':experience' => $data['experience'] ?? null,
+                ':living_situation' => $data['living_situation'] ?? null,
+                ':has_other_pets' => $data['has_other_pets'] ?? false,
+                ':other_pets_details' => $data['other_pets_details'] ?? null,
+                ':daily_schedule' => $data['daily_schedule'] ?? null,
+                ':veterinarian' => $data['veterinarian'] ?? null
+            ]);
+
+            if (!$result) {
+                throw new \Exception("Failed to create application");
             }
 
-            // Verify user exists
-            $user = $this->userModel->findById($data['user_id']);
-            if (!$user) {
-                throw new RuntimeException("User not found");
-            }
-            
-            // Verify pet exists
-            $pet = $this->petModel->findById($data['pet_id']);
-            if (!$pet) {
-                throw new RuntimeException("Pet not found");
-            }
-            
-            // Check if user has already applied for this pet
-            if ($this->applicationModel->hasUserAppliedForPet($data['user_id'], $data['pet_id'])) {
-                throw new RuntimeException("You have already applied to adopt this pet");
-            }
-            
-            // Create application with all provided fields
-            $applicationData = [
-                'user_id' => $data['user_id'],
-                'pet_id' => $data['pet_id'],
-                'status' => 'pending',
-                'application_date' => date('Y-m-d'),
-                'reason' => $data['reason'] ?? null,
-                'experience' => $data['experience'] ?? null,
-                'living_situation' => $data['living_situation'] ?? null,
-                'has_other_pets' => $data['has_other_pets'] ?? false,
-                'other_pets_details' => $data['other_pets_details'] ?? null,
-                'daily_schedule' => $data['daily_schedule'] ?? null,
-                'veterinarian' => $data['veterinarian'] ?? null,
-                'status_history' => json_encode([
-                    [
-                        'status' => 'pending',
-                        'date' => date('Y-m-d H:i:s'),
-                        'note' => 'Application submitted'
-                    ]
-                ])
-            ];
-            
-            // Create application
-            $applicationId = $this->applicationModel->create($applicationData);
-            
-            // Get and format the created application
-            $application = $this->applicationModel->findById($applicationId);
-            if (!$application) {
-                throw new RuntimeException("Failed to create application");
-            }
+            $applicationId = $this->db->lastInsertId();
+            $this->db->commit();
 
-            return [
-                'success' => true,
-                'data' => $application
-            ];
-            
+            return $this->getApplication($applicationId);
         } catch (\Exception $e) {
+            $this->db->rollBack();
             error_log("Error in createApplication: " . $e->getMessage());
             throw $e;
         }
     }
-    
+
+    public function getApplication(int $applicationId): array {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT 
+                    aa.*,
+                    p.name as pet_name,
+                    p.species as pet_species,
+                    p.breed as pet_breed,
+                    s.name as shelter_name
+                FROM Adoption_Application aa
+                JOIN Pet p ON aa.pet_id = p.pet_id
+                JOIN Shelter s ON p.shelter_id = s.shelter_id
+                WHERE aa.application_id = ?
+            ");
+            
+            $stmt->execute([$applicationId]);
+            $application = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$application) {
+                throw new \Exception("Application not found");
+            }
+            
+            return $application;
+        } catch (\Exception $e) {
+            error_log("Error in getApplication: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
     public function getUserApplications(int $userId): array {
-        // Verify user exists
-        $user = $this->userModel->findById($userId);
-        if (!$user) {
-            throw new RuntimeException("User not found");
+        try {
+            $stmt = $this->db->prepare("
+                SELECT 
+                    aa.*,
+                    p.name as pet_name,
+                    p.species as pet_species,
+                    p.breed as pet_breed,
+                    s.name as shelter_name
+                FROM Adoption_Application aa
+                JOIN Pet p ON aa.pet_id = p.pet_id
+                JOIN Shelter s ON p.shelter_id = s.shelter_id
+                WHERE aa.user_id = ?
+                ORDER BY aa.application_date DESC
+            ");
+            
+            $stmt->execute([$userId]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {
+            error_log("Error in getUserApplications: " . $e->getMessage());
+            throw $e;
         }
-        
-        return $this->applicationModel->findByUser($userId);
     }
-    
-    public function getShelterApplications(int $shelterId): array {
-        return $this->applicationModel->findByShelter($shelterId);
-    }
-    
-    public function getApplication(int $applicationId): ?array {
-        $application = $this->applicationModel->findById($applicationId);
-        if (!$application) {
-            throw new RuntimeException("Application not found");
+
+    public function updateApplicationStatus(int $applicationId, string $status): bool {
+        try {
+            $validStatuses = ['pending', 'under_review', 'approved', 'rejected', 'withdrawn'];
+            if (!in_array($status, $validStatuses)) {
+                throw new \Exception("Invalid status");
+            }
+
+            $stmt = $this->db->prepare("
+                UPDATE Adoption_Application 
+                SET status = :status,
+                    last_updated = CURRENT_TIMESTAMP
+                WHERE application_id = :application_id
+            ");
+
+            return $stmt->execute([
+                ':status' => $status,
+                ':application_id' => $applicationId
+            ]);
+        } catch (\Exception $e) {
+            error_log("Error in updateApplicationStatus: " . $e->getMessage());
+            throw $e;
         }
-        return $application;
-    }
-    
-    public function updateApplicationStatus(int $applicationId, string $status): array {
-        // Verify application exists
-        $application = $this->applicationModel->findById($applicationId);
-        if (!$application) {
-            throw new RuntimeException("Application not found");
-        }
-        
-        // Validate status
-        $validStatuses = [
-            AdoptionApplication::STATUS_PENDING,
-            AdoptionApplication::STATUS_UNDER_REVIEW,
-            AdoptionApplication::STATUS_APPROVED,
-            AdoptionApplication::STATUS_REJECTED,
-            AdoptionApplication::STATUS_WITHDRAWN
-        ];
-        
-        if (!in_array($status, $validStatuses)) {
-            throw new RuntimeException("Invalid application status");
-        }
-        
-        // Update status
-        $this->applicationModel->updateStatus($applicationId, $status);
-        
-        return $this->applicationModel->findById($applicationId);
-    }
-    
-    public function getPetApplications(int $petId): array {
-        // Verify pet exists
-        $pet = $this->petModel->findById($petId);
-        if (!$pet) {
-            throw new RuntimeException("Pet not found");
-        }
-        
-        return $this->applicationModel->findByPet($petId);
     }
 }
 === ./backend/src/services/FavoriteService.php ===
@@ -3977,93 +3841,206 @@ class FavoriteService {
 }
 === ./backend/src/services/ShelterService.php ===
 <?php
-// backend/src/services/ShelterService.php
-
 namespace PawPath\services;
 
-use PawPath\models\Shelter;
-use RuntimeException;
+use PDO;
+use PDOException;
+use PawPath\config\database\DatabaseConfig;
 
 class ShelterService {
-    private Shelter $shelterModel;
+    private PDO $db;
     
     public function __construct() {
-        $this->shelterModel = new Shelter();
-    }
-    
-    public function createShelter(array $data): array {
-        // Validate required fields
-        $requiredFields = ['name', 'address', 'phone', 'email'];
-        foreach ($requiredFields as $field) {
-            if (empty($data[$field])) {
-                throw new RuntimeException("Missing required field: $field");
-            }
-        }
-        
-        // Validate email format
-        if (!filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
-            throw new RuntimeException("Invalid email format");
-        }
-        
-        // Validate phone number (basic validation)
-        if (!preg_match("/^[0-9\-\(\)\/\+\s]*$/", $data['phone'])) {
-            throw new RuntimeException("Invalid phone number format");
-        }
-        
-        // Create shelter
-        $shelterId = $this->shelterModel->create($data);
-        
-        // Return the created shelter
-        return $this->shelterModel->findById($shelterId);
-    }
-    
-    public function updateShelter(int $id, array $data): array {
-        // Verify shelter exists
-        $shelter = $this->shelterModel->findById($id);
-        if (!$shelter) {
-            throw new RuntimeException("Shelter not found");
-        }
-        
-        // Validate email if provided
-        if (isset($data['email']) && !filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
-            throw new RuntimeException("Invalid email format");
-        }
-        
-        // Validate phone if provided
-        if (isset($data['phone']) && !preg_match("/^[0-9\-\(\)\/\+\s]*$/", $data['phone'])) {
-            throw new RuntimeException("Invalid phone number format");
-        }
-        
-        // Update shelter
-        $success = $this->shelterModel->update($id, $data);
-        if (!$success) {
-            throw new RuntimeException("Failed to update shelter");
-        }
-        
-        // Return updated shelter
-        return $this->shelterModel->findById($id);
-    }
-    
-    public function deleteShelter(int $id): bool {
-        // Verify shelter exists
-        $shelter = $this->shelterModel->findById($id);
-        if (!$shelter) {
-            throw new RuntimeException("Shelter not found");
-        }
-        
-        return $this->shelterModel->delete($id);
-    }
-    
-    public function getShelter(int $id): ?array {
-        $shelter = $this->shelterModel->findById($id);
-        if (!$shelter) {
-            throw new RuntimeException("Shelter not found");
-        }
-        return $shelter;
+        $this->db = DatabaseConfig::getConnection();
     }
     
     public function listShelters(array $filters = []): array {
-        return $this->shelterModel->findAll($filters);
+        try {
+            $query = "SELECT * FROM Shelter WHERE 1=1";
+            $params = [];
+            
+            if (!empty($filters['search'])) {
+                $query .= " AND (name LIKE ? OR address LIKE ?)";
+                $searchTerm = '%' . $filters['search'] . '%';
+                $params[] = $searchTerm;
+                $params[] = $searchTerm;
+            }
+            
+            if (isset($filters['is_no_kill'])) {
+                $query .= " AND is_no_kill = ?";
+                $params[] = $filters['is_no_kill'];
+            }
+            
+            $query .= " ORDER BY name ASC";
+            
+            $stmt = $this->db->prepare($query);
+            $stmt->execute($params);
+            
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Database error in listShelters: " . $e->getMessage());
+            throw $e;
+        }
+    }
+    
+    public function getShelter(int $id): ?array {
+        try {
+            error_log("Fetching shelter with ID: $id");
+            
+            $stmt = $this->db->prepare("
+                SELECT 
+                    s.*
+                FROM Shelter s
+                WHERE s.shelter_id = ?
+            ");
+            
+            $stmt->execute([$id]);
+            $shelter = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($shelter) {
+                error_log("Found shelter: " . json_encode($shelter));
+                // Convert is_no_kill to boolean
+                $shelter['is_no_kill'] = (bool) $shelter['is_no_kill'];
+                return $shelter;
+            }
+            
+            error_log("No shelter found with ID: $id");
+            return null;
+            
+        } catch (PDOException $e) {
+            error_log("Database error in getShelter: " . $e->getMessage());
+            throw new \RuntimeException("Failed to fetch shelter details: " . $e->getMessage());
+        }
+    }
+
+    public function getTotalPets(int $shelterId): int {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT COUNT(*) 
+                FROM Pet 
+                WHERE shelter_id = ?
+            ");
+            
+            $stmt->execute([$shelterId]);
+            return (int) $stmt->fetchColumn();
+            
+        } catch (PDOException $e) {
+            error_log("Error getting total pets: " . $e->getMessage());
+            return 0;
+        }
+    }
+
+    public function getActiveApplications(int $shelterId): int {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT COUNT(DISTINCT aa.application_id) 
+                FROM Adoption_Application aa
+                JOIN Pet p ON aa.pet_id = p.pet_id
+                WHERE p.shelter_id = ? 
+                AND aa.status IN ('pending', 'under_review')
+            ");
+            
+            $stmt->execute([$shelterId]);
+            return (int) $stmt->fetchColumn();
+            
+        } catch (PDOException $e) {
+            error_log("Error getting active applications: " . $e->getMessage());
+            return 0;
+        }
+    }
+
+    public function createShelter(array $data): array {
+        try {
+            $this->db->beginTransaction();
+
+            $stmt = $this->db->prepare("
+                INSERT INTO Shelter (
+                    name, 
+                    address, 
+                    phone, 
+                    email, 
+                    is_no_kill
+                ) VALUES (
+                    :name,
+                    :address,
+                    :phone,
+                    :email,
+                    :is_no_kill
+                )
+            ");
+
+            $stmt->execute([
+                ':name' => $data['name'],
+                ':address' => $data['address'],
+                ':phone' => $data['phone'],
+                ':email' => $data['email'],
+                ':is_no_kill' => $data['is_no_kill'] ?? false
+            ]);
+
+            $shelterId = $this->db->lastInsertId();
+            $this->db->commit();
+
+            return $this->getShelter($shelterId);
+        } catch (PDOException $e) {
+            $this->db->rollBack();
+            error_log("Database error in createShelter: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    public function updateShelter(int $id, array $data): bool {
+        try {
+            $this->db->beginTransaction();
+
+            $fields = [];
+            $params = [];
+            
+            foreach (['name', 'address', 'phone', 'email', 'is_no_kill'] as $field) {
+                if (isset($data[$field])) {
+                    $fields[] = "$field = ?";
+                    $params[] = $data[$field];
+                }
+            }
+            
+            if (empty($fields)) {
+                return false;
+            }
+
+            $params[] = $id;
+            $query = "UPDATE Shelter SET " . implode(', ', $fields) . " WHERE shelter_id = ?";
+            
+            $stmt = $this->db->prepare($query);
+            $result = $stmt->execute($params);
+
+            $this->db->commit();
+            return $result;
+        } catch (PDOException $e) {
+            $this->db->rollBack();
+            error_log("Database error in updateShelter: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    public function deleteShelter(int $id): bool {
+        try {
+            $this->db->beginTransaction();
+
+            // First check if there are any pets
+            $petCount = $this->getTotalPets($id);
+            if ($petCount > 0) {
+                throw new \RuntimeException("Cannot delete shelter with existing pets");
+            }
+
+            $stmt = $this->db->prepare("DELETE FROM Shelter WHERE shelter_id = ?");
+            $result = $stmt->execute([$id]);
+
+            $this->db->commit();
+            return $result;
+        } catch (PDOException $e) {
+            $this->db->rollBack();
+            error_log("Database error in deleteShelter: " . $e->getMessage());
+            throw $e;
+        }
     }
 }
 === ./backend/src/services/UserRoleService.php ===
@@ -4663,6 +4640,11 @@ class PetService {
     
     public function listPets(array $filters = []): array {
         try {
+            // First check if updated_at column exists
+            $columns = $this->db->query("SHOW COLUMNS FROM Pet")->fetchAll(PDO::FETCH_COLUMN);
+            $hasUpdatedAt = in_array('updated_at', $columns);
+            $hasCreatedAt = in_array('created_at', $columns);
+
             $query = "
                 SELECT p.*, s.name as shelter_name,
                 COUNT(*) OVER() as total_count
@@ -4677,6 +4659,45 @@ class PetService {
                 $query .= " AND (p.name LIKE ? OR p.breed LIKE ? OR p.description LIKE ?)";
                 $searchTerm = '%' . $filters['search'] . '%';
                 $params = array_merge($params, [$searchTerm, $searchTerm, $searchTerm]);
+            }
+
+            // Add sorting based on available columns
+            if (!empty($filters['sort'])) {
+                switch($filters['sort']) {
+                    case 'updated_at DESC':
+                        $query .= $hasUpdatedAt 
+                            ? " ORDER BY p.updated_at DESC" 
+                            : ($hasCreatedAt 
+                                ? " ORDER BY p.created_at DESC" 
+                                : " ORDER BY p.pet_id DESC");
+                        break;
+                    case 'updated_at ASC':
+                        $query .= $hasUpdatedAt 
+                            ? " ORDER BY p.updated_at ASC" 
+                            : ($hasCreatedAt 
+                                ? " ORDER BY p.created_at ASC" 
+                                : " ORDER BY p.pet_id ASC");
+                        break;
+                    case 'name ASC':
+                        $query .= " ORDER BY p.name ASC";
+                        break;
+                    case 'name DESC':
+                        $query .= " ORDER BY p.name DESC";
+                        break;
+                    default:
+                        $query .= $hasUpdatedAt 
+                            ? " ORDER BY p.updated_at DESC" 
+                            : ($hasCreatedAt 
+                                ? " ORDER BY p.created_at DESC" 
+                                : " ORDER BY p.pet_id DESC");
+                }
+            } else {
+                // Default sorting
+                $query .= $hasUpdatedAt 
+                    ? " ORDER BY p.updated_at DESC" 
+                    : ($hasCreatedAt 
+                        ? " ORDER BY p.created_at DESC" 
+                        : " ORDER BY p.pet_id DESC");
             }
             
             // Add pagination
@@ -4696,7 +4717,7 @@ class PetService {
             
             $total = $pets[0]['total_count'] ?? 0;
             
-            // Get images for each pet
+            // Get images and traits for each pet
             foreach ($pets as &$pet) {
                 // Get images
                 $stmt = $this->db->prepare("
@@ -4720,15 +4741,7 @@ class PetService {
                 $traits = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
                 // Format traits
-                $formattedTraits = [];
-                foreach ($traits as $trait) {
-                    $category = $trait['category'] ?? 'General';
-                    if (!isset($formattedTraits[$category])) {
-                        $formattedTraits[$category] = [];
-                    }
-                    $formattedTraits[$category][] = $trait['trait_name'];
-                }
-                $pet['traits'] = $formattedTraits;
+                $pet['traits'] = $this->formatTraits($traits);
                 
                 // Remove the count from individual pets
                 unset($pet['total_count']);
@@ -4743,7 +4756,7 @@ class PetService {
             throw new \RuntimeException("Failed to fetch pets");
         }
     }
-    
+
     public function addTrait(string $traitName): array {
         // Validate trait name
         if (empty(trim($traitName))) {
@@ -6801,6 +6814,14 @@ AppFactory::setContainer($container);
 // Create App
 $app = AppFactory::create();
 
+$app->get('/api/test', function ($request, $response) {
+    $response->getBody()->write(json_encode([
+        'success' => true,
+        'message' => 'API is working'
+    ]));
+    return $response->withHeader('Content-Type', 'application/json');
+});
+
 // Add body parsing middleware
 $app->addBodyParsingMiddleware();
 
@@ -6895,56 +6916,65 @@ $app->group('/api', function ($group) {
         return $controller->resendVerification($request, $response, $args);
     })->add(new RoleMiddleware('admin'));
 
-    // Admin shelter routes
-    $group->get('/admin/shelters', function ($request, $response) {
-        $controller = new AdminController();
-        return $controller->listShelters($request, $response);
+        // Shelter routes with admin-specific functionality
+    $group->group('/admin/shelters', function ($group) {
+        $group->get('', function ($request, $response) {
+            $controller = new AdminController();
+            return $controller->listShelters($request, $response);
+        });
+
+        $group->post('', function ($request, $response) {
+            $controller = new AdminController();
+            return $controller->createShelter($request, $response);
+        });
+
+        $group->get('/{id}', function ($request, $response, $args) {
+            $controller = new AdminController();
+            return $controller->getShelter($request, $response, $args);
+        });
+
+        $group->put('/{id}', function ($request, $response, $args) {
+            $controller = new AdminController();
+            return $controller->updateShelter($request, $response, $args);
+        });
+
+        $group->delete('/{id}', function ($request, $response, $args) {
+            $controller = new AdminController();
+            return $controller->deleteShelter($request, $response, $args);
+        });
     })->add(new RoleMiddleware('admin'));
 
-    $group->post('/admin/shelters', function ($request, $response) {
-        $controller = new AdminController();
-        return $controller->createShelter($request, $response);
-    })->add(new RoleMiddleware('admin'));
+    // Regular shelter routes
+    $group->group('/shelters', function ($group) {
+        // List all shelters
+        $group->get('', function ($request, $response) {
+            $controller = new ShelterController();
+            return $controller->listShelters($request, $response);
+        });
 
-    $group->get('/admin/shelters/{id}', function ($request, $response, $args) {
-        $controller = new AdminController();
-        return $controller->getShelter($request, $response, $args);
-    })->add(new RoleMiddleware('admin'));
+        // Create new shelter
+        $group->post('', function ($request, $response) {
+            $controller = new ShelterController();
+            return $controller->createShelter($request, $response);
+        });
 
-    $group->put('/admin/shelters/{id}', function ($request, $response, $args) {
-        $controller = new AdminController();
-        return $controller->updateShelter($request, $response, $args);
-    })->add(new RoleMiddleware('admin'));
+        // Get specific shelter
+        $group->get('/{id}', function ($request, $response, $args) {
+            $controller = new ShelterController();
+            return $controller->getShelter($request, $response, $args);
+        });
 
-    $group->delete('/admin/shelters/{id}', function ($request, $response, $args) {
-        $controller = new AdminController();
-        return $controller->deleteShelter($request, $response, $args);
-    })->add(new RoleMiddleware('admin'));
-    
-    // Shelter routes
-    $group->post('/shelters', function ($request, $response) {
-        $controller = new ShelterController();
-        return $controller->createShelter($request, $response);
-    });
-    
-    $group->get('/shelters', function ($request, $response) {
-        $controller = new ShelterController();
-        return $controller->listShelters($request, $response);
-    });
-    
-    $group->get('/shelters/{id}', function ($request, $response, $args) {
-        $controller = new ShelterController();
-        return $controller->getShelter($request, $response, $args);
-    });
-    
-    $group->put('/shelters/{id}', function ($request, $response, $args) {
-        $controller = new ShelterController();
-        return $controller->updateShelter($request, $response, $args);
-    });
-    
-    $group->delete('/shelters/{id}', function ($request, $response, $args) {
-        $controller = new ShelterController();
-        return $controller->deleteShelter($request, $response, $args);
+        // Update shelter
+        $group->put('/{id}', function ($request, $response, $args) {
+            $controller = new ShelterController();
+            return $controller->updateShelter($request, $response, $args);
+        });
+
+        // Delete shelter
+        $group->delete('/{id}', function ($request, $response, $args) {
+            $controller = new ShelterController();
+            return $controller->deleteShelter($request, $response, $args);
+        });
     });
     
     // Pet routes

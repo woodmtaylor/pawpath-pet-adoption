@@ -29,6 +29,8 @@ import ShelterManagement from './pages/admin/ShelterManagement';
 import ShelterDashboard from './pages/shelter/ShelterDashboard';
 import ShelterPetManagement from './pages/shelter/ShelterManagement';
 import NewShelterPage from './pages/admin/NewShelterPage';
+import SheltersPage from './pages/SheltersPage';
+import ShelterDetailPage from './pages/ShelterDetailPage';
 
 function App() {
   return (
@@ -103,6 +105,24 @@ function App() {
                   </Routes>
                 </ProtectedRoute>
               }
+            />
+
+            <Route 
+              path="/shelters" 
+              element={
+                <ProtectedRoute>
+                  <SheltersPage />
+                </ProtectedRoute>
+              } 
+            />
+
+            <Route 
+              path="/shelters/:id" 
+              element={
+                <ProtectedRoute>
+                  <ShelterDetailPage />
+                </ProtectedRoute>
+              } 
             />
 
             <Route 

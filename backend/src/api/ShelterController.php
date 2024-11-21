@@ -1,140 +1,79 @@
 <?php
-// backend/src/api/ShelterController.php
-
 namespace PawPath\api;
 
 use PawPath\services\ShelterService;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
+use PawPath\utils\ResponseHelper;
 
 class ShelterController {
     private ShelterService $shelterService;
     
     public function __construct() {
-        $this->shelterService = new ShelterService();
-    }
-    
-    public function createShelter(Request $request, Response $response): Response {
         try {
-            $data = $request->getParsedBody();
-            error_log('Creating shelter with data: ' . print_r($data, true));
-            
-            if (!is_array($data)) {
-                $body = (string) $request->getBody();
-                $data = json_decode($body, true);
-                
-                if (json_last_error() !== JSON_ERROR_NONE) {
-                    throw new \RuntimeException('Invalid JSON data provided');
-                }
-            }
-            
-            $result = $this->shelterService->createShelter($data);
-            
-            $response->getBody()->write(json_encode($result));
-            return $response->withHeader('Content-Type', 'application/json')
-                           ->withStatus(201);
+            $this->shelterService = new ShelterService();
         } catch (\Exception $e) {
-            error_log('Error creating shelter: ' . $e->getMessage());
-            
-            $response->getBody()->write(json_encode([
-                'error' => $e->getMessage()
-            ]));
-            return $response->withHeader('Content-Type', 'application/json')
-                           ->withStatus(400);
+            error_log("Error initializing ShelterController: " . $e->getMessage());
+            throw $e;
         }
     }
-    
+
     public function getShelter(Request $request, Response $response, array $args): Response {
         try {
+            error_log("Getting shelter with ID: " . $args['id']);
+            
             $shelterId = (int) $args['id'];
-            $result = $this->shelterService->getShelter($shelterId);
+            $shelter = $this->shelterService->getShelter($shelterId);
             
-            $response->getBody()->write(json_encode($result));
-            return $response->withHeader('Content-Type', 'application/json');
+            if (!$shelter) {
+                error_log("Shelter not found: " . $shelterId);
+                return ResponseHelper::sendError(
+                    $response,
+                    "Shelter not found",
+                    404
+                );
+            }
+            
+            // Add additional shelter information
+            $shelter['total_pets'] = $this->shelterService->getTotalPets($shelterId);
+            $shelter['active_applications'] = $this->shelterService->getActiveApplications($shelterId);
+            
+            error_log("Found shelter: " . json_encode($shelter));
+            return ResponseHelper::sendResponse($response, $shelter);
+            
         } catch (\Exception $e) {
-            error_log('Error getting shelter: ' . $e->getMessage());
-            
-            $response->getBody()->write(json_encode([
-                'error' => $e->getMessage()
-            ]));
-            return $response->withHeader('Content-Type', 'application/json')
-                           ->withStatus(404);
+            error_log("Error in getShelter: " . $e->getMessage());
+            error_log("Stack trace: " . $e->getTraceAsString());
+            return ResponseHelper::sendError($response, $e->getMessage());
         }
     }
     
     public function listShelters(Request $request, Response $response): Response {
         try {
+            error_log("Listing shelters");
+            
             $queryParams = $request->getQueryParams();
-            $filters = [];
+            error_log("Query params: " . print_r($queryParams, true));
             
-            // Handle search parameter
-            if (!empty($queryParams['search'])) {
-                $filters['search'] = $queryParams['search'];
+            $filters = [
+                'search' => $queryParams['search'] ?? null,
+                'is_no_kill' => isset($queryParams['is_no_kill']) ? 
+                    filter_var($queryParams['is_no_kill'], FILTER_VALIDATE_BOOLEAN) : null
+            ];
+            
+            $shelters = $this->shelterService->listShelters($filters);
+            
+            // Add additional information for each shelter
+            foreach ($shelters as &$shelter) {
+                $shelter['total_pets'] = $this->shelterService->getTotalPets($shelter['shelter_id']);
+                $shelter['active_applications'] = $this->shelterService->getActiveApplications($shelter['shelter_id']);
             }
             
-            // Handle no-kill filter
-            if (isset($queryParams['is_no_kill'])) {
-                $filters['is_no_kill'] = (bool) $queryParams['is_no_kill'];
-            }
-            
-            $result = $this->shelterService->listShelters($filters);
-            
-            $response->getBody()->write(json_encode($result));
-            return $response->withHeader('Content-Type', 'application/json');
+            return ResponseHelper::sendResponse($response, $shelters);
         } catch (\Exception $e) {
-            error_log('Error listing shelters: ' . $e->getMessage());
-            
-            $response->getBody()->write(json_encode([
-                'error' => $e->getMessage()
-            ]));
-            return $response->withHeader('Content-Type', 'application/json')
-                           ->withStatus(500);
-        }
-    }
-    
-    public function updateShelter(Request $request, Response $response, array $args): Response {
-        try {
-            $shelterId = (int) $args['id'];
-            $data = $request->getParsedBody();
-            
-            if (!is_array($data)) {
-                $body = (string) $request->getBody();
-                $data = json_decode($body, true);
-                
-                if (json_last_error() !== JSON_ERROR_NONE) {
-                    throw new \RuntimeException('Invalid JSON data provided');
-                }
-            }
-            
-            $result = $this->shelterService->updateShelter($shelterId, $data);
-            
-            $response->getBody()->write(json_encode($result));
-            return $response->withHeader('Content-Type', 'application/json');
-        } catch (\Exception $e) {
-            error_log('Error updating shelter: ' . $e->getMessage());
-            
-            $response->getBody()->write(json_encode([
-                'error' => $e->getMessage()
-            ]));
-            return $response->withHeader('Content-Type', 'application/json')
-                           ->withStatus(400);
-        }
-    }
-    
-    public function deleteShelter(Request $request, Response $response, array $args): Response {
-        try {
-            $shelterId = (int) $args['id'];
-            $this->shelterService->deleteShelter($shelterId);
-            
-            return $response->withStatus(204);
-        } catch (\Exception $e) {
-            error_log('Error deleting shelter: ' . $e->getMessage());
-            
-            $response->getBody()->write(json_encode([
-                'error' => $e->getMessage()
-            ]));
-            return $response->withHeader('Content-Type', 'application/json')
-                           ->withStatus(400);
+            error_log("Error in listShelters: " . $e->getMessage());
+            error_log("Stack trace: " . $e->getTraceAsString());
+            return ResponseHelper::sendError($response, $e->getMessage());
         }
     }
 }

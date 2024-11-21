@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowRight, Heart, Search, Newspaper, PawPrint } from 'lucide-react';
+import { ArrowRight, Heart, Search, Newspaper, PawPrint, Building2 } from 'lucide-react';
 
 function HomePage() {
   const navigate = useNavigate();
@@ -24,6 +24,9 @@ function HomePage() {
               </Button>
               <Button size="lg" variant="outline" onClick={() => navigate('/pets')}>
                 Browse Pets <Search className="ml-2 h-4 w-4" />
+              </Button>
+              <Button size="lg" variant="secondary" onClick={() => navigate('/shelters')}>
+                View Shelters <Building2 className="ml-2 h-4 w-4" />
               </Button>
             </div>
           </div>
