@@ -347,6 +347,90 @@ class PetController {
                 ->withStatus(400);
         }
     }
+
+
+    public function submitPetForAdoption(Request $request, Response $response): Response {
+        try {
+            $userId = $request->getAttribute('user_id');
+            $data = $request->getParsedBody();
+            
+            // Add the submitting user's ID to the data
+            $data['submitted_by_user_id'] = $userId;
+            $data['status'] = 'pending';
+            
+            // Create the pet with pending status
+            $petId = $this->petService->createPet($data);
+            
+            // Handle image uploads if present
+            $uploadedFiles = $request->getUploadedFiles();
+            if (!empty($uploadedFiles['images'])) {
+                $this->handleImageUploads($petId, $uploadedFiles['images']);
+            }
+            
+            // Return success response
+            return ResponseHelper::sendResponse(
+                $response,
+                ['message' => 'Pet submitted for approval', 'pet_id' => $petId],
+                201
+            );
+        } catch (\Exception $e) {
+            return ResponseHelper::sendError(
+                $response,
+                $e->getMessage(),
+                400
+            );
+        }
+    }
+
+    public function getPetSubmissions(Request $request, Response $response): Response {
+        try {
+            $queryParams = $request->getQueryParams();
+            $status = $queryParams['status'] ?? 'pending';
+            
+            $submissions = $this->petService->getPetSubmissions($status);
+            
+            return ResponseHelper::sendResponse($response, $submissions);
+        } catch (\Exception $e) {
+            return ResponseHelper::sendError($response, $e->getMessage());
+        }
+    }
+
+    public function reviewPetSubmission(Request $request, Response $response, array $args): Response {
+        try {
+            $petId = (int) $args['id'];
+            $userId = $request->getAttribute('user_id');
+            $data = $request->getParsedBody();
+            
+            if (!isset($data['status']) || !in_array($data['status'], ['approved', 'rejected'])) {
+                throw new \InvalidArgumentException('Invalid status provided');
+            }
+            
+            $result = $this->petService->reviewPetSubmission(
+                $petId,
+                $userId,
+                $data['status'],
+                $data['note'] ?? null
+            );
+            
+            return ResponseHelper::sendResponse($response, $result);
+        } catch (\Exception $e) {
+            return ResponseHelper::sendError($response, $e->getMessage());
+        }
+    }
+
+    private function handleImageUploads(int $petId, array $images): void {
+        foreach ($images as $image) {
+            if ($image->getError() === UPLOAD_ERR_OK) {
+                $imageUrl = $this->imageService->uploadImage([
+                    'tmp_name' => $image->getStream()->getMetadata('uri'),
+                    'error' => $image->getError(),
+                    'type' => $image->getClientMediaType()
+                ]);
+                
+                $this->petImageModel->create($petId, $imageUrl, false);
+            }
+        }
+    }
        
 
     public function getPet(Request $request, Response $response, array $args): Response {
@@ -1122,6 +1206,29 @@ class ShelterController {
         } catch (\Exception $e) {
             error_log("Error in getShelter: " . $e->getMessage());
             error_log("Stack trace: " . $e->getTraceAsString());
+            return ResponseHelper::sendError($response, $e->getMessage());
+        }
+    }
+
+    public function getShelterStats(Request $request, Response $response): Response {
+        try {
+            $userId = $request->getAttribute('user_id');
+            $stats = $this->shelterService->getShelterStats($userId);
+            return ResponseHelper::sendResponse($response, $stats);
+        } catch (\Exception $e) {
+            error_log("Error in getShelterStats: " . $e->getMessage());
+            return ResponseHelper::sendError($response, $e->getMessage());
+        }
+    }
+
+    public function getShelterPets(Request $request, Response $response): Response {
+        try {
+            $userId = $request->getAttribute('user_id');
+            $stats = $this->shelterService->getShelterStats($userId);
+            $pets = $this->shelterService->getShelterPets($stats['shelterId']);
+            return ResponseHelper::sendResponse($response, $pets);
+        } catch (\Exception $e) {
+            error_log("Error in getShelterPets: " . $e->getMessage());
             return ResponseHelper::sendError($response, $e->getMessage());
         }
     }
@@ -3910,6 +4017,85 @@ class ShelterService {
         } catch (PDOException $e) {
             error_log("Database error in getShelter: " . $e->getMessage());
             throw new \RuntimeException("Failed to fetch shelter details: " . $e->getMessage());
+        }
+    }
+
+    public function getShelterStats(int $userId): array {
+        try {
+            // First get the shelter ID for this staff member
+            $stmt = $this->db->prepare("
+                SELECT shelter_id 
+                FROM ShelterStaff 
+                WHERE user_id = ?
+            ");
+            $stmt->execute([$userId]);
+            $shelterId = $stmt->fetchColumn();
+
+            if (!$shelterId) {
+                throw new \RuntimeException('User is not associated with any shelter');
+            }
+
+            // Get total pets
+            $stmt = $this->db->prepare("
+                SELECT COUNT(*) 
+                FROM Pet 
+                WHERE shelter_id = ?
+            ");
+            $stmt->execute([$shelterId]);
+            $totalPets = (int) $stmt->fetchColumn();
+
+            // Get active applications
+            $stmt = $this->db->prepare("
+                SELECT COUNT(DISTINCT aa.application_id) 
+                FROM Adoption_Application aa
+                JOIN Pet p ON aa.pet_id = p.pet_id
+                WHERE p.shelter_id = ? 
+                AND aa.status IN ('pending', 'under_review')
+            ");
+            $stmt->execute([$shelterId]);
+            $activeApplications = (int) $stmt->fetchColumn();
+
+            // Get adopted pets (approved applications)
+            $stmt = $this->db->prepare("
+                SELECT COUNT(DISTINCT aa.application_id) 
+                FROM Adoption_Application aa
+                JOIN Pet p ON aa.pet_id = p.pet_id
+                WHERE p.shelter_id = ? 
+                AND aa.status = 'approved'
+            ");
+            $stmt->execute([$shelterId]);
+            $adoptedPets = (int) $stmt->fetchColumn();
+
+            return [
+                'shelterId' => $shelterId,
+                'totalPets' => $totalPets,
+                'activeApplications' => $activeApplications,
+                'adoptedPets' => $adoptedPets
+            ];
+        } catch (PDOException $e) {
+            error_log("Error getting shelter stats: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    public function getShelterPets(int $shelterId): array {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT p.*, 
+                       s.name as shelter_name,
+                       COUNT(DISTINCT aa.application_id) as application_count
+                FROM Pet p
+                LEFT JOIN Shelter s ON p.shelter_id = s.shelter_id
+                LEFT JOIN Adoption_Application aa ON p.pet_id = aa.pet_id AND aa.status IN ('pending', 'under_review')
+                WHERE p.shelter_id = ?
+                GROUP BY p.pet_id
+                ORDER BY p.pet_id DESC
+            ");
+            $stmt->execute([$shelterId]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Error getting shelter pets: " . $e->getMessage());
+            throw $e;
         }
     }
 
@@ -6952,6 +7138,16 @@ $app->group('/api', function ($group) {
             return $controller->listShelters($request, $response);
         });
 
+        $group->get('/shelter/stats', function ($request, $response) {
+            $controller = new ShelterController();
+            return $controller->getShelterStats($request, $response);
+        });
+
+        $group->get('/shelter/pets', function ($request, $response) {
+            $controller = new ShelterController();
+            return $controller->getShelterPets($request, $response);
+        });
+
         // Create new shelter
         $group->post('', function ($request, $response) {
             $controller = new ShelterController();
@@ -7001,6 +7197,22 @@ $app->group('/api', function ($group) {
     $group->delete('/pets/{id}', function ($request, $response, $args) {
         $controller = new PetController();
         return $controller->deletePet($request, $response, $args);
+    });
+
+    $group->post('/pets/submit', function ($request, $response) {
+        $controller = new PetController();
+        return $controller->submitPetForAdoption($request, $response);
+    });
+
+    // Add inside admin routes group
+    $group->get('/admin/pet-submissions', function ($request, $response) {
+        $controller = new PetController();
+        return $controller->getPetSubmissions($request, $response);
+    });
+
+    $group->put('/admin/pet-submissions/{id}', function ($request, $response, $args) {
+        $controller = new PetController();
+        return $controller->reviewPetSubmission($request, $response, $args);
     });
     
     // Pet trait routes
