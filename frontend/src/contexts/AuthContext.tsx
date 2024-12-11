@@ -14,11 +14,12 @@ import {
 import api from '@/lib/axios';
 
 interface AuthContextType {
-    isAuthenticated: boolean;
-    user: User | null;
-    login: (email: string, password: string) => Promise<void>;
-    logout: () => void;
-    isLoading: boolean;
+  isAuthenticated: boolean;
+  user: User | null;
+  setUser: (user: User | null) => void;  // Add this line
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => void;
+  isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -73,7 +74,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             try {
                 setIsLoading(true);
                 const token = getStoredToken();
-                const storedUser = getStoredUser();
                 
                 if (!token) {
                     setIsLoading(false);
@@ -83,16 +83,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
                 
                 try {
-                    // Verify token with backend
                     const response = await api.get('/auth/me');
                     const userData = response.data.data.user;
-                    
-                    if (JSON.stringify(userData) !== JSON.stringify(storedUser)) {
-                        setStoredUser(userData);
-                        setUser(userData);
-                    } else {
-                        setUser(storedUser);
-                    }
+
+                    // Get profile data which includes the profile image
+                    const profileResponse = await api.get('/profile');
+                    const profileData = profileResponse.data.data;
+
+                    // Merge profile data with user data
+                    const userWithProfile = {
+                        ...userData,
+                        profile_image: profileData.profile_image
+                    };
+
+                    setUser(userWithProfile);
+                    setStoredUser(userWithProfile);
                 } catch (error) {
                     console.error('Token verification failed:', error);
                     logout();
@@ -104,7 +109,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setIsLoading(false);
             }
         };
-
         initializeAuth();
     }, []);
 
@@ -113,12 +117,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const response = await api.post('/auth/login', { email, password });
             const { token, user: userData } = response.data.data;
             
+            // After successful login, fetch profile data
+            const profileResponse = await api.get('/profile');
+            const profileData = profileResponse.data.data;
+
+            // Merge user data with profile image
+            const userWithProfile = {
+                ...userData,
+                profile_image: profileData.profile_image || null
+            };
+            
             setStoredToken(token);
             api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-            setStoredUser(userData);
-            setUser(userData);
+            setStoredUser(userWithProfile);
+            setUser(userWithProfile);
             
-            console.log('Login successful, user:', userData);
+            console.log('Login successful, user:', userWithProfile); // Debug log
         } catch (error) {
             console.error('Login error:', error);
             throw error;
@@ -137,6 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             value={{ 
                 isAuthenticated: !!user, 
                 user, 
+                setUser,
                 login, 
                 logout,
                 isLoading 

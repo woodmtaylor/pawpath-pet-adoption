@@ -33,6 +33,10 @@ import NewPetPage from '@/pages/shelter/NewPetPage';
 import SheltersPage from '@/pages/SheltersPage';
 import ShelterDetailPage from '@/pages/ShelterDetailPage';
 
+// Blog Pages
+import BlogListPage from '@/pages/blog/BlogListPage';
+import BlogDetailPage from '@/pages/blog/BlogDetailPage';
+
 function App() {
   return (
     <AuthProvider>
@@ -150,6 +154,24 @@ function App() {
               element={
                 <ProtectedRoute>
                   <ShelterDetailPage />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Blog Routes */}
+            <Route 
+              path="/blog" 
+              element={
+                <ProtectedRoute>
+                  <BlogListPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route 
+              path="/blog/:id" 
+              element={
+                <ProtectedRoute>
+                  <BlogDetailPage />
                 </ProtectedRoute>
               }
             />

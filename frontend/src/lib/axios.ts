@@ -1,8 +1,10 @@
 import axios from 'axios';
 import { getStoredToken } from '@/stores/auth';
 
+console.log('API Base URL:', import.meta.env.VITE_API_URL || '/api');
+
 const api = axios.create({
-    baseURL: '/api', // This will be prepended to all requests
+    baseURL: '/api',  // This should match your backend API prefix
     headers: {
         'Content-Type': 'application/json',
     },

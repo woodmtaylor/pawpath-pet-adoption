@@ -1,6 +1,7 @@
 <?php
 namespace PawPath\api;
 
+use PawPath\services\ImageUploadService;
 use PawPath\models\UserProfile;
 use PawPath\utils\ResponseHelper;
 use Psr\Http\Message\ResponseInterface as Response;
@@ -8,9 +9,11 @@ use Psr\Http\Message\ServerRequestInterface as Request;
 
 class UserProfileController {
     private UserProfile $profileModel;
+    private ImageUploadService $imageService;
     
     public function __construct() {
         $this->profileModel = new UserProfile();
+        $this->imageService = new ImageUploadService();
     }
     
     public function getProfile(Request $request, Response $response): Response {
@@ -25,6 +28,32 @@ class UserProfileController {
             return ResponseHelper::sendResponse($response, $profile);
         } catch (\Exception $e) {
             return ResponseHelper::sendError($response, $e->getMessage());
+        }
+    }
+
+    public function uploadProfileImage(Request $request, Response $response): Response {
+        try {
+            $userId = $request->getAttribute('user_id');
+            $uploadedFiles = $request->getUploadedFiles();
+            
+            if (empty($uploadedFiles['profile_image'])) {
+                throw new \RuntimeException('No image uploaded');
+            }
+            
+            $uploadedFile = $uploadedFiles['profile_image'];
+            $imageUrl = $this->imageService->uploadProfileImage([
+                'tmp_name' => $uploadedFile->getStream()->getMetadata('uri'),
+                'error' => $uploadedFile->getError(),
+                'type' => $uploadedFile->getClientMediaType()
+            ]);
+            
+            $this->profileModel->updateProfileImage($userId, $imageUrl);
+            
+            return ResponseHelper::sendResponse($response, [
+                'profile_image' => $imageUrl
+            ]);
+        } catch (\Exception $e) {
+            return ResponseHelper::sendError($response, $e->getMessage(), 400);
         }
     }
     

@@ -5,6 +5,7 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 use Slim\Factory\AppFactory;
+use Slim\Routing\RouteCollectorProxy;
 use DI\Container;
 use PawPath\api\AuthController;
 use PawPath\api\ShelterController;
@@ -57,6 +58,9 @@ $app->post('/api/auth/verify-email', function ($request, $response) {
     $controller = new AuthController();
     return $controller->verifyEmail($request, $response);
 });
+
+$app->post('/api/profile/image', [UserProfileController::class, 'uploadProfileImage'])
+    ->add(new AuthMiddleware());
 
 $app->post('/api/auth/resend-verification', function ($request, $response) {
     $controller = new AuthController();
@@ -389,32 +393,6 @@ $app->group('/api', function ($group) {
         return $controller->updateApplicationStatus($request, $response, $args);
     });
 
-    // Blog routes
-    $group->post('/blog/posts', function ($request, $response) {
-        $controller = new BlogController();
-        return $controller->createPost($request, $response);
-    });
-
-    $group->get('/blog/posts', function ($request, $response) {
-        $controller = new BlogController();
-        return $controller->listPosts($request, $response);
-    });
-
-    $group->get('/blog/posts/{id}', function ($request, $response, $args) {
-        $controller = new BlogController();
-        return $controller->getPost($request, $response, $args);
-    });
-
-    $group->put('/blog/posts/{id}', function ($request, $response, $args) {
-        $controller = new BlogController();
-        return $controller->updatePost($request, $response, $args);
-    });
-
-    $group->delete('/blog/posts/{id}', function ($request, $response, $args) {
-        $controller = new BlogController();
-        return $controller->deletePost($request, $response, $args);
-    });
-
     // Product routes
     $group->post('/products', function ($request, $response) {
         $controller = new ProductController();
@@ -439,6 +417,12 @@ $app->group('/api', function ($group) {
     $group->delete('/products/{id}', function ($request, $response, $args) {
         $controller = new ProductController();
         return $controller->deleteProduct($request, $response, $args);
+    });
+
+    $group->group('/blog', function($group) {
+        $group->get('', [\PawPath\api\BlogController::class, 'listPosts']);  // <-- This route handles /api/blog
+        $group->get('/posts', [\PawPath\api\BlogController::class, 'listPosts']);
+        $group->get('/posts/{id}', [\PawPath\api\BlogController::class, 'getPost']);
     });
 
 })->add(new AuthMiddleware());

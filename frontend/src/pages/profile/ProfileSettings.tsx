@@ -6,7 +6,16 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useToast } from '@/hooks/use-toast';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 import {
   Select,
   SelectContent,
@@ -14,12 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
+import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/axios';
 
 const profileSchema = z.object({
@@ -27,19 +31,22 @@ const profileSchema = z.object({
   last_name: z.string().min(1, 'Last name is required'),
   phone: z.string().min(10, 'Please enter a valid phone number'),
   email: z.string().email('Please enter a valid email'),
-  address: z.string().optional(),
-  city: z.string().optional(),
-  state: z.string().optional(),
-  zip_code: z.string().optional(),
-  housing_type: z.enum(['house', 'apartment', 'condo', 'other']).optional(),
-  has_yard: z.boolean().optional(),
+  address: z.string().nullable(),
+  city: z.string().nullable(),
+  state: z.string().nullable(),
+  zip_code: z.string().nullable(),
+  housing_type: z.enum(['house', 'apartment', 'condo', 'other']).nullable(),
+  has_yard: z.boolean().nullable(),
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
 
 export default function ProfileSettings() {
   const [loading, setLoading] = useState(true);
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
+  const { user, setUser } = useAuth();
   
   const form = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema)
@@ -48,9 +55,11 @@ export default function ProfileSettings() {
   useEffect(() => {
     const loadProfile = async () => {
       try {
+        setLoading(true);
         const response = await api.get('/profile');
         const profileData = response.data.data;
         form.reset(profileData);
+        setProfileImage(profileData.profile_image);
       } catch (error) {
         toast({
           variant: "destructive",
@@ -65,19 +74,93 @@ export default function ProfileSettings() {
     loadProfile();
   }, []);
 
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      try {
+          setIsUploading(true);
+          const formData = new FormData();
+          formData.append('profile_image', file);
+
+          const response = await api.post('/profile/image', formData, {
+              headers: {
+                  'Content-Type': 'multipart/form-data',
+              },
+          });
+
+          console.log('Image upload response:', JSON.stringify(response.data, null, 2));
+
+          if (response.data.success) {
+              const newImageUrl = response.data.data.profile_image;
+              console.log('New image URL:', newImageUrl);  // Add this line
+              setProfileImage(newImageUrl);
+              
+              if (user) {
+                  const updatedUser = {
+                      ...user,
+                      profile_image: newImageUrl
+                  };
+                  setUser(updatedUser);
+              }
+
+              toast({
+                  title: "Success",
+                  description: "Profile picture updated successfully",
+              });
+          }
+      } catch (error: any) {
+          console.error('Upload error:', error);  // Add this line
+          toast({
+              variant: "destructive",
+              title: "Error",
+              description: error.response?.data?.error || "Failed to upload image",
+          });
+      } finally {
+          setIsUploading(false);
+      }
+  };
+  const [isSaving, setIsSaving] = useState(false);
+
   const onSubmit = async (data: ProfileFormData) => {
     try {
-      await api.put('/profile', data);
-      toast({
-        title: "Success",
-        description: "Profile updated successfully",
-      });
-    } catch (error) {
+      console.log('Submitting form data:', data); // Debug log
+      setIsSaving(true);
+
+      // Filter out null values and convert empty strings to null
+      const cleanedData = Object.entries(data).reduce((acc, [key, value]) => ({
+        ...acc,
+        [key]: value === '' ? null : value
+      }), {});
+
+      const response = await api.put('/profile', cleanedData);
+      console.log('API response:', response); // Debug log
+
+      if (response.data.success) {
+        // Update global user state and storage
+        if (user && setUser) {
+          const updatedUser = {
+            ...user,
+            ...cleanedData
+          };
+          setUser(updatedUser);
+          localStorage.setItem('user', JSON.stringify(updatedUser));
+        }
+
+        toast({
+          title: "Success",
+          description: "Profile updated successfully",
+        });
+      }
+    } catch (error: any) {
+      console.error('Profile update error:', error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to update profile",
+        description: error.response?.data?.error || "Failed to update profile",
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -90,166 +173,205 @@ export default function ProfileSettings() {
   }
 
   return (
-    <div className="container max-w-4xl mx-auto p-6">
-      <Tabs defaultValue="general">
-        <TabsList>
-          <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="security">Security</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="general">
-          <Card>
-            <CardHeader>
-              <CardTitle>Profile Settings</CardTitle>
-              <CardDescription>
-                Update your personal information
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="first_name">First Name</Label>
-                    <Input
-                      id="first_name"
-                      {...form.register('first_name')}
-                      placeholder="John"
-                    />
-                    {form.formState.errors.first_name && (
-                      <p className="text-sm text-red-500">
-                        {form.formState.errors.first_name.message}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="last_name">Last Name</Label>
-                    <Input
-                      id="last_name"
-                      {...form.register('last_name')}
-                      placeholder="Doe"
-                    />
-                    {form.formState.errors.last_name && (
-                      <p className="text-sm text-red-500">
-                        {form.formState.errors.last_name.message}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    {...form.register('email')}
-                    placeholder="john.doe@example.com"
+    <div className="container max-w-2xl mx-auto p-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Profile Settings</CardTitle>
+          <CardDescription>
+            Update your personal information
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form 
+              onSubmit={form.handleSubmit(onSubmit)} 
+              className="space-y-6"
+            >
+              <div className="flex items-center gap-6 mb-6">
+                <Avatar className="w-24 h-24">
+                  <AvatarImage src={profileImage || ''} alt="Profile" />
+                  <AvatarFallback>
+                    {form.getValues('first_name')?.[0]?.toUpperCase() || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="profile_image">Profile Picture</Label>
+                  <input
+                    type="file"
+                    id="profile_image"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageUpload}
                   />
-                  {form.formState.errors.email && (
-                    <p className="text-sm text-red-500">
-                      {form.formState.errors.email.message}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone</Label>
-                  <Input
-                    id="phone"
-                    {...form.register('phone')}
-                    placeholder="(555) 555-5555"
-                  />
-                  {form.formState.errors.phone && (
-                    <p className="text-sm text-red-500">
-                      {form.formState.errors.phone.message}
-                    </p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="address">Address</Label>
-                  <Input
-                    id="address"
-                    {...form.register('address')}
-                    placeholder="123 Main St"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="city">City</Label>
-                    <Input
-                      id="city"
-                      {...form.register('city')}
-                      placeholder="City"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="state">State</Label>
-                    <Input
-                      id="state"
-                      {...form.register('state')}
-                      placeholder="State"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="housing_type">Housing Type</Label>
-                  <Select
-                    defaultValue={form.getValues('housing_type')}
-                    onValueChange={(value) => form.setValue('housing_type', value as any)}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => document.getElementById('profile_image')?.click()}
+                    disabled={isUploading}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select housing type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="house">House</SelectItem>
-                      <SelectItem value="apartment">Apartment</SelectItem>
-                      <SelectItem value="condo">Condo</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    {isUploading ? 'Uploading...' : 'Change Picture'}
+                  </Button>
                 </div>
+              </div>
 
-                <Button type="submit" className="w-full">
-                  Save Changes
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="first_name"  // This must match the schema
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>First Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="John" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-        <TabsContent value="notifications">
-          <Card>
-            <CardHeader>
-              <CardTitle>Notification Settings</CardTitle>
-              <CardDescription>
-                Manage your notification preferences
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {/* Add notification settings here */}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                <FormField
+                  control={form.control}
+                  name="last_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Last Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Doe" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-        <TabsContent value="security">
-          <Card>
-            <CardHeader>
-              <CardTitle>Security Settings</CardTitle>
-              <CardDescription>
-                Manage your account security
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {/* Add security settings here */}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        type="email"
+                        placeholder="john.doe@example.com"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="(555) 555-5555" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Address</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="123 Main St" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-3 gap-4">
+                <FormField
+                  control={form.control}
+                  name="city"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>City</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="City" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="state"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>State</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="State" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="zip_code"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>ZIP Code</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="ZIP Code" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="housing_type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Housing Type</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select housing type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="house">House</SelectItem>
+                        <SelectItem value="apartment">Apartment</SelectItem>
+                        <SelectItem value="condo">Condo</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <Button 
+                type="submit" 
+                className="w-full"
+                disabled={isSaving}
+              >
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

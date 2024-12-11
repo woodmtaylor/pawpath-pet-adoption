@@ -91,4 +91,18 @@ class UserProfile {
             throw $e;
         }
     }
+
+    public function updateProfileImage(int $userId, string $imageUrl): bool {
+        try {
+            $stmt = $this->db->prepare("
+                UPDATE UserProfile 
+                SET profile_image = ?
+                WHERE user_id = ?
+            ");
+            return $stmt->execute([$imageUrl, $userId]);
+        } catch (PDOException $e) {
+            error_log("Error updating profile image: " . $e->getMessage());
+            throw $e;
+        }
+    }
 }

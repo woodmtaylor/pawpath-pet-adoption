@@ -16,6 +16,7 @@ export interface UserProfile {
     username: string;
     role: 'adopter' | 'shelter_staff' | 'admin';
     account_status: 'pending' | 'active' | 'suspended';
+    profile_image: string | null;
 }
 
 export interface ProfileUpdateData {

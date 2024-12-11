@@ -5,6 +5,7 @@ export interface User {
   username: string;
   email: string;
   role: 'admin' | 'shelter_staff' | 'adopter';
+  profile_image?: string | null;
 }
 
 // Create atoms for user and loading state

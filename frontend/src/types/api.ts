@@ -1,3 +1,11 @@
+export interface User {
+    user_id: number;
+    username: string;
+    email: string;
+    role: 'admin' | 'shelter_staff' | 'adopter';
+    profile_image?: string;
+}
+
 export interface PetImage {
     image_id: number;
     url: string;

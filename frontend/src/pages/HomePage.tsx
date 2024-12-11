@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowRight, Heart, Search, Newspaper, PawPrint, Building2 } from 'lucide-react';
+import { ArrowRight, Heart, Search, Newspaper, PawPrint, Building2, Calendar } from 'lucide-react';
 
 function HomePage() {
   const navigate = useNavigate();
@@ -122,6 +122,41 @@ function HomePage() {
             Take the Quiz Now
             <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
+        </div>
+      </section>
+
+      {/* Blog Section */}
+      <section className="py-16 bg-background">
+        <div className="container mx-auto px-4">
+          <div className="flex justify-between items-center mb-8">
+            <div>
+              <h2 className="text-3xl font-bold">Latest Pet Care Tips</h2>
+              <p className="text-muted-foreground">
+                Expert advice and recommendations for pet parents
+              </p>
+            </div>
+            <Button variant="outline" onClick={() => navigate('/blog')}>
+              View All <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Add 3 placeholder cards until we fetch real data */}
+            {[1, 2, 3].map((i) => (
+              <Card key={i} className="cursor-pointer" onClick={() => navigate('/blog')}>
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm mb-3">
+                    <Calendar className="h-4 w-4" />
+                    {new Date().toLocaleDateString()}
+                  </div>
+                  <h3 className="font-semibold mb-2">Essential Pet Care Tips</h3>
+                  <p className="text-muted-foreground line-clamp-2">
+                    Learn how to provide the best care for your furry friends with our expert tips and recommendations.
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
       </section>
     </div>
