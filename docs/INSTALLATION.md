@@ -1220,25 +1220,3 @@ iptables -A INPUT -p tcp --dport 22 -j ACCEPT
 ```
 
 ---
-
-## Need Help?
-
-If you encounter issues not covered in this guide:
-
-1. **Check the logs** - Most issues are revealed in error logs
-2. **Review the troubleshooting section** above
-3. **Search existing issues** on GitHub
-4. **Create a new issue** with:
-   - Your environment details
-   - Steps to reproduce
-   - Error messages
-   - Log outputs
-
-For additional support:
-- 📧 Email: support@pawpath.com
-- 💬 GitHub Discussions: [Project Discussions](https://github.com/yourusername/pawpath-pet-adoption/discussions)
-- 🐛 Bug Reports: [GitHub Issues](https://github.com/yourusername/pawpath-pet-adoption/issues)
-
----
-
-*Last updated: December 2024*
