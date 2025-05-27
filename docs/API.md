@@ -1,7 +1,5 @@
 # PawPath API Documentation
 
-This document provides comprehensive documentation for the PawPath REST API.
-
 ## Base URL
 
 ```
