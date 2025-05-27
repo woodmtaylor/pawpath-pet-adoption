@@ -1,6 +1,11 @@
-# PawPath
-
-**A comprehensive pet adoption platform connecting shelters, pets, and potential adopters through intelligent matching algorithms.**
+<div align="center">
+  <img src="images/Frontpage.png" alt="PawPath Welcome Page" width="150"/>
+  
+  # PawPath 🐾
+  
+  **A comprehensive pet adoption platform connecting shelters, pets, and potential adopters through intelligent matching algorithms.**
+  
+</div>
 
 [![PHP Version](https://img.shields.io/badge/PHP-8.1%2B-blue.svg)](https://php.net)
 [![React](https://img.shields.io/badge/React-18-blue.svg)](https://reactjs.org)
