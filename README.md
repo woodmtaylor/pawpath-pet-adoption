@@ -127,7 +127,7 @@ cd frontend
 npm run test
 ```
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 
@@ -158,7 +158,7 @@ VITE_API_URL=http://localhost:8000/api
 VITE_APP_NAME=PawPath
 ```
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 pawpath-pet-adoption/
