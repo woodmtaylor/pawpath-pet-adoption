@@ -27,11 +27,11 @@
 ## Architecture
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│  React Frontend │    │   PHP Backend   │    │  MySQL Database │
-│   (TypeScript)  │◄──►│ (Slim Framework)│◄──►│     (8.0+)      │
-│                 │    │                 │    │                 │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│  React Frontend │    │   PHP Backend    │    │  MySQL Database │
+│  (TypeScript)   │◄──►│ (Slim Framework) │◄──►│     (8.0+)      │
+│                 │    │                  │    │                 │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
 ```
 
 ### Backend Stack
@@ -183,5 +183,5 @@ pawpath-pet-adoption/
 │   ├── public/            # Public assets
 │   └── package.json       # Node.js dependencies
 ├── docs/                  # Documentation
-└── README.md              # This file
+└── README.md              
 ```
