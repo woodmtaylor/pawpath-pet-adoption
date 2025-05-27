@@ -166,9 +166,9 @@ VITE_APP_NAME=PawPath
 
 ```
 pawpath-pet-adoption/
-├── backend/                 # PHP Backend
-│   ├── public/             # Web server entry point
-│   ├── src/                # Application source code
+├── backend/               # PHP Backend
+│   ├── public/            # Web server entry point
+│   ├── src/               # Application source code
 │   │   ├── api/           # API Controllers
 │   │   ├── models/        # Data Models
 │   │   ├── services/      # Business Logic
@@ -177,7 +177,7 @@ pawpath-pet-adoption/
 │   ├── database/          # Database migrations
 │   ├── tests/             # Test suite
 │   └── composer.json      # PHP dependencies
-├── frontend/               # React Frontend
+├── frontend/              # React Frontend
 │   ├── src/               # Source code
 │   │   ├── components/    # React Components
 │   │   ├── pages/         # Page Components
