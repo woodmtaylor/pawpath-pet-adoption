@@ -2,7 +2,7 @@
 
   # PawPath 🐾
   
-  <img src="images/Frontpage.png" alt="PawPath Welcome Page" height="500" width="720"/>
+  <img src="images/Frontpage.png" alt="PawPath Welcome Page" width="500"/>
   
   **A comprehensive pet adoption platform connecting shelters, pets, and potential adopters through intelligent matching algorithms.**
   
