@@ -1,7 +1,8 @@
 <div align="center">
-  <img src="images/Frontpage.png" alt="PawPath Welcome Page" width="150"/>
-  
+
   # PawPath 🐾
+  
+  <img src="images/Frontpage.png" alt="PawPath Welcome Page"/>
   
   **A comprehensive pet adoption platform connecting shelters, pets, and potential adopters through intelligent matching algorithms.**
   
