@@ -1,10 +1,5 @@
 # PawPath Architecture Overview
 
-This document provides a comprehensive overview of the PawPath system architecture, design patterns, and technical decisions.
-
-## Table of Contents
-
-- [System Overview](#system-overview)
 - [High-Level Architecture](#high-level-architecture)
 - [Backend Architecture](#backend-architecture)
 - [Frontend Architecture](#frontend-architecture)
@@ -14,27 +9,6 @@ This document provides a comprehensive overview of the PawPath system architectu
 - [Deployment Architecture](#deployment-architecture)
 - [Performance Considerations](#performance-considerations)
 - [Scalability Strategy](#scalability-strategy)
-
----
-
-## System Overview
-
-PawPath is a modern web application designed to facilitate pet adoption by connecting shelters, pets, and potential adopters through an intelligent matching system.
-
-### Core Objectives
-
-- **User Experience**: Intuitive interface for finding and adopting pets
-- **Efficiency**: Streamlined adoption process for shelters and adopters
-- **Intelligence**: AI-powered pet-adopter matching algorithm
-- **Scalability**: Architecture that supports growth
-- **Security**: Robust protection of user and pet data
-
-### Key Stakeholders
-
-- **Adopters**: Individuals/families seeking pets
-- **Shelter Staff**: Managing pet listings and applications
-- **Administrators**: Platform oversight and management
-- **Pets**: The beneficiaries of successful matches
 
 ---
 
@@ -143,7 +117,7 @@ PawPath is a modern web application designed to facilitate pet adoption by conne
 
 ```
 backend/
-├── public/                 # Web server document root
+├── public/                # Web server document root
 │   ├── index.php          # Application entry point
 │   ├── .htaccess          # URL rewriting rules
 │   └── uploads/           # User-uploaded files
@@ -991,7 +965,7 @@ class SendNotificationHandler
 Browser Cache → CDN → Application Cache → Database Query Cache → Database
      ↓             ↓           ↓                    ↓              ↓
   Static Files   Static     Session/User        Query Results   Raw Data
-               Content       Data
+                 Content       Data
 ```
 
 ---
