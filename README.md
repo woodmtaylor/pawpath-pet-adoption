@@ -109,7 +109,6 @@ PawPath follows a modern full-stack architecture:
 - **[API Documentation](docs/API.md)** - Complete REST API reference
 - **[Database Schema](docs/DATABASE.md)** - Database structure and relationships
 - **[Installation Guide](docs/INSTALLATION.md)** - Detailed setup instructions
-- **[Contributing Guide](CONTRIBUTING.md)** - How to contribute to the project
 - **[Architecture Overview](docs/ARCHITECTURE.md)** - System design and patterns
 
 ## Testing
