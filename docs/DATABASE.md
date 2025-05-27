@@ -1,9 +1,5 @@
 # PawPath Database Schema
 
-PawPath uses MySQL 8.0+ with a normalized relational database design. The schema supports multi-role user management, pet listings with traits, adoption applications, and content management.
-
-## Entity Relationship Diagram
-
 ```
 ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
 │    User     │    │   Shelter   │    │     Pet     │
