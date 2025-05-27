@@ -1,4 +1,4 @@
-# PawPath 🐾
+# PawPath
 
 **A comprehensive pet adoption platform connecting shelters, pets, and potential adopters through intelligent matching algorithms.**
 
@@ -8,7 +8,7 @@
 [![MySQL](https://img.shields.io/badge/MySQL-8.0-orange.svg)](https://mysql.com)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-## 🌟 Features
+## Features
 
 ### Core Functionality
 - **🔍 Intelligent Pet Matching** - AI-powered quiz system that matches users with compatible pets
@@ -25,14 +25,14 @@
 - **🔐 Secure Authentication** - JWT-based authentication with email verification
 - **📈 Analytics Dashboard** - Administrative insights and reporting
 
-## 🏗️ Architecture
+## Architecture
 
 PawPath follows a modern full-stack architecture:
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   React Frontend │    │   PHP Backend   │    │  MySQL Database │
-│   (TypeScript)   │◄──►│ (Slim Framework)│◄──►│     (8.0+)      │
+│  React Frontend │    │   PHP Backend   │    │  MySQL Database │
+│   (TypeScript)  │◄──►│ (Slim Framework)│◄──►│     (8.0+)      │
 │                 │    │                 │    │                 │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
@@ -52,7 +52,7 @@ PawPath follows a modern full-stack architecture:
 - **Styling**: Tailwind CSS
 - **State Management**: React Context/Hooks
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - PHP 8.1 or higher
@@ -104,7 +104,7 @@ PawPath follows a modern full-stack architecture:
    - Frontend: http://localhost:5173
    - Backend API: http://localhost:8000/api
 
-## 📚 Documentation
+## Documentation
 
 - **[API Documentation](docs/API.md)** - Complete REST API reference
 - **[Database Schema](docs/DATABASE.md)** - Database structure and relationships
@@ -112,7 +112,7 @@ PawPath follows a modern full-stack architecture:
 - **[Contributing Guide](CONTRIBUTING.md)** - How to contribute to the project
 - **[Architecture Overview](docs/ARCHITECTURE.md)** - System design and patterns
 
-## 🧪 Testing
+## Testing
 
 ### Backend Testing
 ```bash
@@ -189,41 +189,3 @@ pawpath-pet-adoption/
 ├── docs/                  # Documentation
 └── README.md              # This file
 ```
-
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### Development Workflow
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Add tests for new functionality
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
-6. Push to the branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- **Shelter Partners** - For providing insights into adoption processes
-- **Open Source Community** - For the amazing tools and libraries
-- **Contributors** - Everyone who has contributed to making PawPath better
-
-## 📞 Support
-
-- **Issues**: [GitHub Issues](https://github.com/yourusername/pawpath-pet-adoption/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/pawpath-pet-adoption/discussions)
-- **Email**: support@pawpath.com
-
----
-
-<div align="center">
-  <p>Made with ❤️ for pets and their future families</p>
-  <p>
-    <a href="#pawpath-">Back to top</a>
-  </p>
-</div>
