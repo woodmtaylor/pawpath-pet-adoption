@@ -16,30 +16,30 @@
 ┌─────────────────────────────────────────────────────────────┐
 │                    Client Layer                             │
 ├─────────────────────────────────────────────────────────────┤
-│  React Frontend (TypeScript)                               │
-│  • Responsive Web Interface                                │
-│  • Progressive Web App Features                            │
-│  • Real-time Notifications                                 │
+│  React Frontend (TypeScript)                                │
+│  • Responsive Web Interface                                 │
+│  • Progressive Web App Features                             │
+│  • Real-time Notifications                                  │
 └─────────────────────────┬───────────────────────────────────┘
                           │ HTTPS/REST API
 ┌─────────────────────────▼───────────────────────────────────┐
 │                 Application Layer                           │
 ├─────────────────────────────────────────────────────────────┤
-│  PHP Backend (Slim Framework)                              │
-│  • RESTful API Services                                    │
-│  • Business Logic Processing                               │
-│  • Authentication & Authorization                          │
-│  • File Upload Management                                  │
+│  PHP Backend (Slim Framework)                               │
+│  • RESTful API Services                                     │
+│  • Business Logic Processing                                │
+│  • Authentication & Authorization                           │
+│  • File Upload Management                                   │
 └─────────────────────────┬───────────────────────────────────┘
                           │ Database Queries
 ┌─────────────────────────▼───────────────────────────────────┐
 │                    Data Layer                               │
 ├─────────────────────────────────────────────────────────────┤
-│  MySQL Database                                            │
-│  • Relational Data Storage                                 │
-│  • ACID Compliance                                         │
-│  • Optimized Indexing                                      │
-│  • Backup & Recovery                                       │
+│  MySQL Database                                             │
+│  • Relational Data Storage                                  │
+│  • ACID Compliance                                          │
+│  • Optimized Indexing                                       │
+│  • Backup & Recovery                                        │
 └─────────────────────────────────────────────────────────────┘
 
         External Services Integration
@@ -105,7 +105,7 @@
                       │
 ┌─────────────────────▼───────────────────────────────────────┐
 │                 Database Layer                              │
-│  • MySQL database                                          │
+│  • MySQL database                                           │
 │  • Connection management                                    │
 │  • Query optimization                                       │
 └─────────────────────────────────────────────────────────────┘
