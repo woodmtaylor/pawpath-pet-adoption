@@ -1,3 +1,35 @@
+# PawPath Database Schema
+
+```
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│    User     │    │   Shelter   │    │     Pet     │
+│             │    │             │    │             │
+├─────────────┤    ├─────────────┤    ├─────────────┤
+│ user_id (PK)│    │shelter_id(PK│    │ pet_id (PK) │
+│ username    │    │ name        │    │ name        │
+│ email       │    │ address     │    │ species     │
+│ role        │    │ phone       │    │ breed       │
+│ ...         │    │ ...         │    │ shelter_id  │
+└─────────────┘    └─────────────┘    └─────────────┘
+       │                   │                   │
+       │                   └───────────────────┘
+       │
+       └─────────────────┐
+                         │
+                ┌─────────────┐
+                │Adoption_App │
+                │             │
+                ├─────────────┤
+                │app_id (PK)  │
+                │ user_id     │
+                │ pet_id      │
+                │ status      │
+                │ ...         │
+                └─────────────┘
+```
+
+---
+
 1. [Core Tables](#core-tables)
    - [User](#user)
    - [UserProfile](#userprofile)
@@ -32,38 +64,6 @@
     - [Get Pet with All Related Information](#get-pet-with-all-related-information)
     - [Get User's Application History](#get-users-application-history)
     - [Get Quiz Results with Matching Pets](#get-quiz-results-with-matching-pets)
-
-# PawPath Database Schema
-
-```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│    User     │    │   Shelter   │    │     Pet     │
-│             │    │             │    │             │
-├─────────────┤    ├─────────────┤    ├─────────────┤
-│ user_id (PK)│    │shelter_id(PK│    │ pet_id (PK) │
-│ username    │    │ name        │    │ name        │
-│ email       │    │ address     │    │ species     │
-│ role        │    │ phone       │    │ breed       │
-│ ...         │    │ ...         │    │ shelter_id  │
-└─────────────┘    └─────────────┘    └─────────────┘
-       │                   │                   │
-       │                   └───────────────────┘
-       │
-       └─────────────────┐
-                         │
-                ┌─────────────┐
-                │Adoption_App │
-                │             │
-                ├─────────────┤
-                │app_id (PK)  │
-                │ user_id     │
-                │ pet_id      │
-                │ status      │
-                │ ...         │
-                └─────────────┘
-```
-
----
 
 ## Core Tables
 
