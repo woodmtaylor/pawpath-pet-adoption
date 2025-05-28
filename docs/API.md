@@ -1,7 +1,5 @@
 # PawPath API Documentation
 
-### Table of Contents
-
 1. [Base URL](#base-url)
 2. [Authentication](#authentication)
 3. [Response Format](#response-format)
